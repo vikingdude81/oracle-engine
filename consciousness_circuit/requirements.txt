@@ -1,0 +1,8 @@
+# Consciousness Circuit v2.1
+# A universal consciousness measurement circuit for transformer LLMs
+
+torch>=2.0.0
+transformers>=4.35.0
+bitsandbytes>=0.41.0
+accelerate>=0.24.0
+numpy>=1.24.0

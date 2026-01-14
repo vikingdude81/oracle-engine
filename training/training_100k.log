@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "C:\Users\akbon\OneDrive\Documents\GitHub\harmonic-field-consciousness\NanoGPT\train_100k_production.py", line 21, in <module>
+    from unsloth import FastLanguageModel
+ModuleNotFoundError: No module named 'unsloth'

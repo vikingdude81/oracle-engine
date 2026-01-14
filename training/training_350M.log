@@ -1,0 +1,12 @@
+Using device: cuda
+Loading data from data\shakespeare.txt...
+Traceback (most recent call last):
+  File "C:\Users\akbon\OneDrive\Documents\GitHub\harmonic-field-consciousness\NanoGPT\train_v5_with_validation.py", line 362, in <module>
+    main()
+  File "C:\Users\akbon\OneDrive\Documents\GitHub\harmonic-field-consciousness\NanoGPT\train_v5_with_validation.py", line 327, in main
+    train_loader, val_loader, vocab_size = prepare_data(
+                                           ^^^^^^^^^^^^^
+  File "C:\Users\akbon\OneDrive\Documents\GitHub\harmonic-field-consciousness\NanoGPT\train_v5_with_validation.py", line 257, in prepare_data
+    with open(data_path, 'r', encoding='utf-8') as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'data\\shakespeare.txt'

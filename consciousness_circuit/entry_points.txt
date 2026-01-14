@@ -1,0 +1,4 @@
+[console_scripts]
+consciousness-discover = consciousness_circuit.cli:main_discover
+consciousness-measure = consciousness_circuit.cli:main_measure
+consciousness-validate = consciousness_circuit.cli:main_validate

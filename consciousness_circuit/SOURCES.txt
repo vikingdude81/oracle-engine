@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+setup.py
+consciousness_circuit.egg-info/PKG-INFO
+consciousness_circuit.egg-info/SOURCES.txt
+consciousness_circuit.egg-info/dependency_links.txt
+consciousness_circuit.egg-info/entry_points.txt
+consciousness_circuit.egg-info/requires.txt
+consciousness_circuit.egg-info/top_level.txt

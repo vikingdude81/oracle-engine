@@ -1,0 +1,18 @@
+# Oracle Engine Requirements
+
+# Core ML
+torch>=2.0.0
+transformers>=4.36.0
+accelerate>=0.25.0
+bitsandbytes>=0.41.0
+
+# Numerical
+numpy>=1.21.0
+scipy>=1.7.0
+
+# Visualization
+matplotlib>=3.5.0
+
+# CLI (optional)
+rich>=12.0.0
+typer>=0.9.0
