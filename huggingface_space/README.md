@@ -43,14 +43,14 @@ Probe the depths of meta-cognitive processing in a model fine-tuned on 200,000 e
 ### 3-Stage Progressive Fine-Tuning
 
 | Stage | Dataset | Examples | Purpose |
-|-------|---------|----------|----------|
+|-------|---------|----------|---------|
 | 1 | **OpenHermes 2.5** | 100,000 | Instruction following |
 | 2 | **MetaMathQA** | 50,000 | Mathematical reasoning |
 | 3 | **Magicoder-OSS-Instruct** | 50,000 | Code generation |
 
 ---
 
-## 🔬 The Consciousness Circuit
+## 🔬 Consciousness Circuit v3.0
 
 Measures **7 dimensions** of consciousness-like processing in hidden states:
 
@@ -63,6 +63,15 @@ Measures **7 dimensions** of consciousness-like processing in hidden states:
 | Self-Expression | Model expressing opinions | +0.109 |
 | Abstraction | Pattern recognition | +0.109 |
 | Sequential | Step-by-step reasoning | +0.087 |
+
+### 🆕 v3.0 Optimizations (32B Models)
+
+| Feature | Description |
+|---------|-------------|
+| **Adaptive Layer Selection** | Depth-aware layer fraction (0.65 for 64-layer models) |
+| **Ensemble Measurement** | Multi-layer scoring for robustness |
+| **Batch Processing** | Memory-efficient batched inference |
+| **Activation Caching** | LRU cache for repeated measurements |
 
 ---
 
