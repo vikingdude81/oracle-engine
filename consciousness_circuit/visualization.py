@@ -130,6 +130,117 @@ class TokenTrajectory:
         
         plt.show()
         return fig
+
+
+# ---------------------------------------------------------------------------
+# Logit lens visualization
+# ---------------------------------------------------------------------------
+
+def plot_logit_lens_top1(logit_lens_results: List[List[Tuple[str, float]]], title: str = "Logit lens (top-1 per layer)"):
+    """Plot the top-1 token probability per layer from logit lens output.
+
+    logit_lens_results: list over layers, each entry is list of (token, prob).
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        raise ImportError("Visualization requires matplotlib. Install with: pip install consciousness-circuit[viz]")
+
+    top_tokens = [layer_res[0][0] if layer_res else "" for layer_res in logit_lens_results]
+    top_probs = [layer_res[0][1] if layer_res else 0.0 for layer_res in logit_lens_results]
+    layers = np.arange(len(logit_lens_results))
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(layers, top_probs, marker="o")
+    for i, (tok, prob) in enumerate(zip(top_tokens, top_probs)):
+        ax.text(i, prob + 0.01, tok, rotation=45, ha="right", va="bottom", fontsize=8)
+
+    ax.set_xlabel("Layer")
+    ax.set_ylabel("Top-1 prob")
+    ax.set_title(title)
+    ax.set_ylim(0, 1.05)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Patch impact heatmap
+# ---------------------------------------------------------------------------
+
+def plot_patch_heatmap(layer_metrics: Dict[int, float], title: str = "Patch impact by layer"):
+    """Visualize patching results (layer -> metric) as a heatmap/bar hybrid."""
+    try:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+    except ImportError:
+        raise ImportError("Visualization requires matplotlib and seaborn. Install with: pip install consciousness-circuit[viz]")
+
+    layers = sorted(layer_metrics.keys())
+    values = [layer_metrics[l] for l in layers]
+
+    fig, ax = plt.subplots(figsize=(10, 3))
+    sns.heatmap(np.array(values)[None, :], cmap="YlGnBu", annot=True, fmt=".3f",
+                xticklabels=layers, yticklabels=["metric"], ax=ax, cbar_kws={"label": "target metric"})
+    ax.set_xlabel("Layer")
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.show()
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Residual scatter (PCA/UMAP)
+# ---------------------------------------------------------------------------
+
+def plot_residual_scatter(residuals: np.ndarray, labels: List[str], method: str = "pca", title: str = "Residual scatter"):
+    """Project residuals to 2D for quick inspection.
+
+    residuals: shape (n, d)
+    labels: list of strings for coloring
+    method: "pca" or "umap" (umap requires umap-learn)
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        raise ImportError("Visualization requires matplotlib. Install with: pip install consciousness-circuit[viz]")
+
+    if residuals.ndim != 2:
+        raise ValueError("residuals must be 2D (n, d)")
+
+    if method == "pca":
+        try:
+            from sklearn.decomposition import PCA
+        except ImportError:
+            raise ImportError("PCA requires scikit-learn. Install with: pip install scikit-learn")
+        reducer = PCA(n_components=2)
+        emb = reducer.fit_transform(residuals)
+    elif method == "umap":
+        try:
+            import umap  # type: ignore
+        except ImportError:
+            raise ImportError("UMAP requires umap-learn. Install with: pip install umap-learn")
+        reducer = umap.UMAP(n_components=2)
+        emb = reducer.fit_transform(residuals)
+    else:
+        raise ValueError("method must be 'pca' or 'umap'")
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    unique_labels = sorted(set(labels))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_labels)))
+    for c, lbl in zip(colors, unique_labels):
+        mask = [l == lbl for l in labels]
+        ax.scatter(emb[mask, 0], emb[mask, 1], s=20, color=c, alpha=0.8, label=lbl)
+
+    ax.set_title(title)
+    ax.set_xlabel("dim 1")
+    ax.set_ylabel("dim 2")
+    ax.legend(loc="best", fontsize=8)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+    return fig
     
     def plot_dimensions(self, figsize=(14, 8), save_path: Optional[str] = None):
         """
