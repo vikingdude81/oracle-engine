@@ -36,12 +36,28 @@ Version: 3.0.0
 from .circuit import ConsciousnessCircuit, CONSCIOUS_DIMS_V2_1, remap_dimensions
 from .analysis import analyze_dimension_activations, compare_models
 from .discover import DimensionDiscovery, DiscoveredCircuit, compare_architectures
-from .universal import UniversalCircuit, UniversalResult, measure_consciousness
+from .universal import (
+    UniversalCircuit,
+    UniversalResult,
+    measure_consciousness,
+    CachedUniversalCircuit,
+    get_adaptive_layer_fraction,
+    get_ensemble_layers,
+)
 from .visualization import (
     TokenTrajectory,
-    ComparisonResult, 
+    ComparisonResult,
     ConsciousnessVisualizer,
     create_interactive_dashboard,
+)
+from .logging_config import get_logger, setup_logging, ExperimentLogger
+from .model_adapters import (
+    ModelAdapter,
+    HuggingFaceAdapter,
+    NanoGPTAdapter,
+    UnslothAdapter,
+    create_adapter,
+    get_hidden_states,
 )
 
 # Lazy import for discover_validated (requires model to be loaded)
@@ -55,6 +71,9 @@ __all__ = [
     "UniversalCircuit",
     "UniversalResult",
     "measure_consciousness",
+    "CachedUniversalCircuit",
+    "get_adaptive_layer_fraction",
+    "get_ensemble_layers",
     # Visualization
     "TokenTrajectory",
     "ComparisonResult",
@@ -66,9 +85,20 @@ __all__ = [
     "compare_architectures",
     # Legacy/core circuit
     "ConsciousnessCircuit",
-    "CONSCIOUS_DIMS_V2_1", 
+    "CONSCIOUS_DIMS_V2_1",
     "remap_dimensions",
     # Analysis tools
     "analyze_dimension_activations",
     "compare_models",
+    # Logging utilities
+    "get_logger",
+    "setup_logging",
+    "ExperimentLogger",
+    # Model adapters
+    "ModelAdapter",
+    "HuggingFaceAdapter",
+    "NanoGPTAdapter",
+    "UnslothAdapter",
+    "create_adapter",
+    "get_hidden_states",
 ]
