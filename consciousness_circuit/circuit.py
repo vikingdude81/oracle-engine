@@ -27,7 +27,7 @@ REFERENCE_HIDDEN_DIM = 5120
 CONSCIOUS_DIMS_V2_1 = {
     3183: {"name": "Logic", "weight": 0.239, "polarity": +1},           # 0.22 / 0.92 = 0.239
     212:  {"name": "Self-Reflective", "weight": 0.196, "polarity": +1}, # 0.18 / 0.92 = 0.196
-    5065: {"name": "Self-Expression", "weight": 0.109, "polarity": +1}, # 0.10 / 0.92 = 0.109
+    5064: {"name": "Self-Expression", "weight": 0.109, "polarity": +1}, # 0.10 / 0.92 = 0.109 (was 5065, fixed for hidden=5120)
     4707: {"name": "Uncertainty", "weight": 0.130, "polarity": +1},     # 0.12 / 0.92 = 0.130
     295:  {"name": "Sequential", "weight": 0.087, "polarity": +1},      # 0.08 / 0.92 = 0.087
     1445: {"name": "Computation", "weight": 0.130, "polarity": -1},     # 0.12 / 0.92 = 0.130
