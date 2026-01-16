@@ -159,7 +159,9 @@ class AttractorLockPlugin:
             centroid = hidden_states
         else:
             # Use late trajectory as attractor (most refined state)
-            centroid = np.mean(hidden_states[-10:], axis=0)
+            # Use last 10% or at least 5 states
+            window_size = max(5, len(hidden_states) // 10)
+            centroid = np.mean(hidden_states[-window_size:], axis=0)
         
         # Check if similar attractor already exists
         for attractor in self.attractors:

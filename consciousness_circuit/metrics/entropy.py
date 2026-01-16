@@ -399,9 +399,14 @@ def _normal_cdf(x: float) -> float:
     """
     Approximate cumulative distribution function for standard normal.
     
-    Uses error function approximation.
+    Uses error function approximation via tanh.
+    Coefficients are derived from Abramowitz & Stegun approximation.
     """
-    return 0.5 * (1 + np.tanh(0.7978845608 * (x + 0.044715 * x ** 3)))
+    # Constants for erf approximation
+    SQRT_2_OVER_PI = 0.7978845608  # sqrt(2/pi)
+    ERF_COEFFICIENT = 0.044715
+    
+    return 0.5 * (1 + np.tanh(SQRT_2_OVER_PI * (x + ERF_COEFFICIENT * x ** 3)))
 
 
 __all__ = [

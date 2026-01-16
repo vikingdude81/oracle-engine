@@ -353,8 +353,9 @@ def detect_attractor_convergence(trajectory: np.ndarray,
     n_steps, n_features = trajectory.shape
     
     # Compute centroid of late trajectory (potential attractor)
-    split_point = max(n_steps // 2, n_steps - 10)
-    late_trajectory = trajectory[split_point:]
+    # Use last 20% or at least 10 states
+    window_size = max(10, n_steps // 5)
+    late_trajectory = trajectory[-window_size:]
     attractor_candidate = np.mean(late_trajectory, axis=0)
     
     # Compute distances to attractor over time
