@@ -2,38 +2,43 @@
 Plugin Architecture for Consciousness Analysis
 ==============================================
 
-Extensible plugin system for adding new analysis methods to consciousness measurement.
+Extensible plugin system for analysis and intervention.
+
+Analysis Plugins (existing):
+- TrajectoryPlugin: MSD and motion analysis
+- ChaosPlugin: Lyapunov and Hurst exponents
+- AgencyPlugin: Goal-directedness metrics
+
+Intervention Plugins (new):
+- AttractorLockPlugin: Stabilize chaos by nudging toward attractors
+- CoherenceBoostPlugin: Maintain memory by injecting early context
+- GoalDirectorPlugin: Enhance agency by amplifying direction
+
+Base Classes:
+- AnalysisPlugin: For computing metrics
+- InterventionPlugin: For modifying hidden states
+- PluginRegistry: For managing multiple plugins
 """
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import numpy as np
 
+# Import base classes
+from .base import (
+    PluginResult,
+    AnalysisPlugin,
+    InterventionPlugin,
+    PluginRegistry,
+)
 
-class AnalysisPlugin(ABC):
-    """Base class for analysis plugins."""
-    
-    def __init__(self, name: str):
-        self.name = name
-    
-    @abstractmethod
-    def analyze(self, hidden_states: np.ndarray, **kwargs) -> Dict[str, Any]:
-        """
-        Analyze hidden states and return metrics.
-        
-        Args:
-            hidden_states: Hidden state trajectories [sequence_length, hidden_dim]
-            **kwargs: Additional parameters specific to the plugin
-            
-        Returns:
-            Dictionary of analysis results
-        """
-        raise NotImplementedError
-    
-    def __repr__(self):
-        return f"{self.__class__.__name__}(name='{self.name}')"
+# Import intervention plugins
+from .attractor_lock import AttractorLockPlugin, AttractorMemory
+from .coherence_boost import CoherenceBoostPlugin
+from .goal_director import GoalDirectorPlugin
 
 
+# Original analysis plugins (for backward compatibility)
 class TrajectoryPlugin(AnalysisPlugin):
     """Plugin for trajectory analysis (MSD, ballistic/diffusive motion)."""
     
@@ -128,8 +133,18 @@ class AgencyPlugin(AnalysisPlugin):
 
 
 __all__ = [
+    # Base classes
+    "PluginResult",
     "AnalysisPlugin",
+    "InterventionPlugin",
+    "PluginRegistry",
+    # Analysis plugins
     "TrajectoryPlugin",
     "ChaosPlugin",
     "AgencyPlugin",
+    # Intervention plugins
+    "AttractorLockPlugin",
+    "AttractorMemory",
+    "CoherenceBoostPlugin",
+    "GoalDirectorPlugin",
 ]
