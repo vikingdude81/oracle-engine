@@ -1,32 +1,39 @@
 """
-Consciousness Circuit v3.0
-==========================
+Consciousness Circuit v3.0 - Modular Consciousness Analysis Toolkit
+===================================================================
 
 Measure meta-cognitive signatures ("consciousness-like" activations) in transformer LLMs.
 Detects how much a model's hidden states resemble reflective, uncertain, multi-perspective reasoning
 versus quick, automatic responses.
 
-Quick Start:
+Full Pipeline:
     from consciousness_circuit import measure_consciousness
     result = measure_consciousness(model, tokenizer, "What is consciousness?")
     print(f"Score: {result.score:.3f}")
+
+Individual Components (Standalone):
+    # Just metrics
+    from consciousness_circuit.metrics import compute_lyapunov, compute_hurst
+    lyap = compute_lyapunov(x, y)
+    hurst = compute_hurst(sequence)
+    
+    # Just classification
+    from consciousness_circuit.classifiers import SignalClass, classify_signal
+    classification = classify_signal({'lyapunov': lyap, 'hurst': hurst})
+    
+    # Just plugins
+    from consciousness_circuit.plugins import AttractorLockPlugin
+    plugin = AttractorLockPlugin()
+    
+    # Just training
+    from consciousness_circuit.training import ConsciousnessRewardModel
+    reward = ConsciousnessRewardModel.compute_from_metrics(metrics)
 
 Per-Token Analysis:
     from consciousness_circuit import ConsciousnessVisualizer
     viz = ConsciousnessVisualizer()
     trajectory = viz.measure_per_token(model, tokenizer, "Let me think about this...")
     trajectory.plot()  # Interactive visualization
-
-Full API:
-    from consciousness_circuit import UniversalCircuit, ValidationBasedDiscovery
-    
-    # Measure with auto-detection
-    circuit = UniversalCircuit()
-    result = circuit.measure(model, tokenizer, prompt)
-    
-    # Discover new circuit for a model
-    discovery = ValidationBasedDiscovery(model, tokenizer)
-    circuit = discovery.discover()
 
 Author: VFD-Org
 License: MIT
@@ -59,6 +66,17 @@ from .model_adapters import (
     create_adapter,
     get_hidden_states,
 )
+
+# New modular components (v3.0)
+from .metrics import (
+    compute_lyapunov,
+    compute_hurst,
+    compute_msd,
+    compute_agency_score,
+)
+from .classifiers import SignalClass, classify_signal
+from .plugins import AttractorLockPlugin
+from .training import ConsciousnessRewardModel
 
 # Lazy import for discover_validated (requires model to be loaded)
 def _get_validation_discovery():
@@ -101,4 +119,13 @@ __all__ = [
     "UnslothAdapter",
     "create_adapter",
     "get_hidden_states",
+    # Modular components (v3.0)
+    "compute_lyapunov",
+    "compute_hurst",
+    "compute_msd",
+    "compute_agency_score",
+    "SignalClass",
+    "classify_signal",
+    "AttractorLockPlugin",
+    "ConsciousnessRewardModel",
 ]
