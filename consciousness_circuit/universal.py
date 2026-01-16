@@ -46,6 +46,8 @@ class UniversalResult:
     # Ensemble info (optional)
     ensemble_layers: Optional[list] = None
     ensemble_scores: Optional[Dict[int, float]] = None
+    # Trajectory metrics (optional)
+    trajectory_metrics: Optional[Dict[str, Any]] = None
 
     @property
     def dimension_contributions(self) -> Dict[str, float]:
@@ -314,6 +316,7 @@ class UniversalCircuit:
         logit_lens_top_k: int = 5,
         use_adaptive_layer: bool = True,
         layer_override: Optional[int] = None,
+        include_trajectory: bool = False,
     ) -> UniversalResult:
         """
         Measure consciousness score for a prompt.
@@ -328,6 +331,7 @@ class UniversalCircuit:
             logit_lens_top_k: Number of top tokens to return per layer
             use_adaptive_layer: Use depth-aware layer selection (recommended for 32B+)
             layer_override: Manually specify target layer (ignores adaptive)
+            include_trajectory: If True, compute trajectory dynamics (Lyapunov, Hurst, etc.)
 
         Returns:
             UniversalResult with score, metadata, and optional hidden_states/logit_lens
@@ -422,6 +426,15 @@ class UniversalCircuit:
             except Exception as e:
                 # Fail gracefully if logit lens doesn't work for this model
                 logit_lens_out = None
+        
+        # Optional: compute trajectory metrics
+        trajectory_metrics_out = None
+        if include_trajectory:
+            try:
+                trajectory_metrics_out = self._compute_trajectory_metrics(hidden_seq.numpy())
+            except Exception as e:
+                # Fail gracefully if trajectory analysis fails
+                trajectory_metrics_out = None
                 
         return UniversalResult(
             score=score,
@@ -432,6 +445,7 @@ class UniversalCircuit:
             hidden_states=hidden_states_out,
             logit_lens=logit_lens_out,
             target_layer=target_layer,
+            trajectory_metrics=trajectory_metrics_out,
         )
 
     def measure_ensemble(
@@ -799,6 +813,48 @@ class UniversalCircuit:
             circuits[name] = str(path)
             
         return circuits
+    
+    def _compute_trajectory_metrics(self, hidden_states: np.ndarray) -> Dict[str, Any]:
+        """
+        Compute trajectory dynamics metrics.
+        
+        Args:
+            hidden_states: Hidden state trajectory [seq_len, hidden_dim]
+            
+        Returns:
+            Dictionary with trajectory metrics
+        """
+        from .helios_metrics import (
+            compute_lyapunov_exponent,
+            compute_hurst_exponent,
+            compute_msd_from_trajectory,
+            verify_signal,
+        )
+        from .tame_metrics import compute_agency_score, detect_attractor_convergence
+        
+        # Compute chaos metrics
+        lyapunov = compute_lyapunov_exponent(hidden_states)
+        hurst = compute_hurst_exponent(hidden_states)
+        
+        # Compute trajectory class
+        signal_class = verify_signal(hidden_states, lyapunov, hurst)
+        
+        # Compute MSD
+        msd = compute_msd_from_trajectory(hidden_states)
+        
+        # Compute agency metrics
+        agency = compute_agency_score(hidden_states)
+        attractor_strength, is_converging = detect_attractor_convergence(hidden_states)
+        
+        return {
+            "lyapunov": float(lyapunov),
+            "hurst": float(hurst),
+            "signal_class": signal_class,
+            "msd_mean": float(np.mean(msd)) if len(msd) > 0 else 0.0,
+            "agency_score": float(agency),
+            "attractor_strength": float(attractor_strength),
+            "is_converging": bool(is_converging),
+        }
 
 
 class CachedUniversalCircuit(UniversalCircuit):

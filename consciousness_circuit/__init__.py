@@ -59,6 +59,15 @@ from .model_adapters import (
     create_adapter,
     get_hidden_states,
 )
+from .trajectory_wrapper import ConsciousnessTrajectoryAnalyzer, TrajectoryAnalysisResult
+from .helios_metrics import (
+    compute_lyapunov_exponent,
+    compute_hurst_exponent,
+    compute_msd_from_trajectory,
+    SignalClass,
+    verify_signal,
+)
+from .tame_metrics import TAMEMetrics, compute_agency_score, detect_attractor_convergence
 
 # Lazy import for discover_validated (requires model to be loaded)
 def _get_validation_discovery():
@@ -101,4 +110,17 @@ __all__ = [
     "UnslothAdapter",
     "create_adapter",
     "get_hidden_states",
+    # Trajectory analysis
+    "ConsciousnessTrajectoryAnalyzer",
+    "TrajectoryAnalysisResult",
+    # Helios metrics
+    "compute_lyapunov_exponent",
+    "compute_hurst_exponent",
+    "compute_msd_from_trajectory",
+    "SignalClass",
+    "verify_signal",
+    # TAME metrics
+    "TAMEMetrics",
+    "compute_agency_score",
+    "detect_attractor_convergence",
 ]

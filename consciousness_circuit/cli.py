@@ -318,5 +318,89 @@ def main_validate():
     print(f"Proper Ordering: {'✓ YES' if proper_order else '✗ NO'}")
 
 
+def main_trajectory():
+    """CLI entry point for consciousness-trajectory command."""
+    parser = argparse.ArgumentParser(
+        prog="consciousness-trajectory",
+        description="Deep trajectory analysis with consciousness measurement",
+    )
+    parser.add_argument(
+        "prompt",
+        type=str,
+        help="Text to analyze (or use - to read from stdin)",
+    )
+    parser.add_argument(
+        "--model", "-m",
+        type=str,
+        default="Qwen/Qwen2.5-0.5B-Instruct",
+        help="HuggingFace model name or path",
+    )
+    parser.add_argument(
+        "--device", "-d",
+        type=str,
+        default="cuda",
+        choices=["cuda", "cpu", "auto"],
+        help="Device to run on",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
+    )
+    parser.add_argument(
+        "--full-analysis",
+        action="store_true",
+        help="Include full per-token trajectory",
+    )
+    
+    args = parser.parse_args()
+    
+    # Handle stdin
+    if args.prompt == "-":
+        args.prompt = sys.stdin.read().strip()
+    
+    # Load model
+    print(f"Loading {args.model}...", file=sys.stderr)
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    import torch
+    
+    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model,
+        torch_dtype=torch.bfloat16,
+        device_map=args.device if args.device != "auto" else "auto",
+        trust_remote_code=True,
+    )
+    
+    # Analyze
+    from .trajectory_wrapper import ConsciousnessTrajectoryAnalyzer
+    
+    analyzer = ConsciousnessTrajectoryAnalyzer()
+    analyzer.bind_model(model, tokenizer)
+    
+    print(f"\nAnalyzing: {args.prompt[:60]}...", file=sys.stderr)
+    result = analyzer.deep_analyze(args.prompt, include_per_token=args.full_analysis)
+    
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        print(f"\n{'='*70}")
+        print(f"Trajectory Analysis Results")
+        print(f"{'='*70}")
+        print(f"\nConsciousness Score: {result.consciousness_score:.3f}")
+        print(f"Trajectory Class: {result.trajectory_class}")
+        print(f"Lyapunov (chaos): {result.lyapunov:.4f}")
+        print(f"Hurst (memory): {result.hurst:.4f}")
+        print(f"Agency Score: {result.agency_score:.4f}")
+        print(f"Goal-directedness: {result.goal_directedness:.4f}")
+        print(f"Attractor Strength: {result.attractor_strength:.4f}")
+        print(f"Is Converging: {'Yes' if result.is_converging else 'No'}")
+        
+        print(f"\n{'='*70}")
+        print(f"Interpretation")
+        print(f"{'='*70}")
+        print(result.interpretation())
+
+
 if __name__ == "__main__":
     main_measure()

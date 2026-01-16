@@ -37,6 +37,7 @@ dependencies = [
     "torch>=2.0.0",
     "transformers>=4.30.0",
     "numpy>=1.20.0",
+    "scipy>=1.7.0",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +61,7 @@ all = [
 consciousness-measure = "consciousness_circuit.cli:main_measure"
 consciousness-discover = "consciousness_circuit.cli:main_discover"
 consciousness-validate = "consciousness_circuit.cli:main_validate"
+consciousness-trajectory = "consciousness_circuit.cli:main_trajectory"
 
 [project.urls]
 Homepage = "https://github.com/VFD-Org/consciousness-circuit"
