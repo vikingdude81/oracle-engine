@@ -3,4 +3,8 @@ transformers>=4.36.0
 torch>=2.0.0
 accelerate>=0.25.0
 bitsandbytes>=0.41.0
+peft>=0.18.0
+huggingface_hub>=0.20.0
 numpy
+matplotlib
+pillow
