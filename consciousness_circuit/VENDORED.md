@@ -6,7 +6,7 @@ package. Do not edit files here directly — changes will be overwritten on the 
 - **Canonical source:** `harmonic-field-consciousness/consciousness_circuit`
   (https://github.com/vikingdude81/harmonic-field-consciousness)
 - **Synced version:** 3.5.1
-- **Synced from commit:** 783d65f (harmonic-field-consciousness)
+- **Synced from commit:** 8115b7c (harmonic-field-consciousness)
 - **Synced on:** 2026-07-12
 
 ## Why vendored?
