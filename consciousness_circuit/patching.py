@@ -1,1 +1,70 @@
-"""\nActivation patching utilities: clean→corrupt residual swaps to localize causal layers.\n"""\nfrom typing import Any, Dict, List, Optional\n\nimport torch\n\nfrom .hooks import _find_layer_stack\n\n\ndef _run_forward(model, tokenizer, prompt: str, device: Optional[str] = None):\n    device = device or str(next(model.parameters()).device)\n    encoded = tokenizer(prompt, return_tensors="pt").to(device)\n    with torch.no_grad():\n        out = model(\n            **encoded,\n            output_hidden_states=True,\n            use_cache=False,\n        )\n    return encoded, out.hidden_states, out.logits\n\n\ndef residual_patch_sweep(\n    model: torch.nn.Module,\n    tokenizer: Any,\n    prompt_clean: str,\n    prompt_corrupt: str,\n    target_fn,\n    layer_indices: Optional[List[int]] = None,\n    token_pos: int = -1,\n) -> Dict[int, float]:\n    """\n    For each layer, patch corrupt run with clean residuals and measure target metric delta.\n\n    target_fn: callable(logits, encoded_inputs) -> float\n    returns: {layer_idx: metric_with_patch}\n    """\n    device = str(next(model.parameters()).device)\n    layers = _find_layer_stack(model)\n    if layer_indices is None:\n        layer_indices = list(range(len(layers)))\n\n    encoded_clean, hidden_clean, _ = _run_forward(model, tokenizer, prompt_clean, device)\n    encoded_corrupt, _, _ = _run_forward(model, tokenizer, prompt_corrupt, device)\n\n    results: Dict[int, float] = {}\n\n    for layer_idx in layer_indices:\n        # Patch hook\n        def make_hook(clean_tensor):\n            def hook(_mod, _inp, out):\n                if not torch.is_tensor(out):\n                    return out\n                patched = out.clone()\n                patched[:, token_pos, :] = clean_tensor[:, token_pos, :]\n                return patched\n            return hook\n\n        handle = layers[layer_idx].register_forward_hook(make_hook(hidden_clean[layer_idx]))\n        with torch.no_grad():\n            out = model(\n                **encoded_corrupt,\n                output_hidden_states=False,\n                use_cache=False,\n            )\n        metric = float(target_fn(out.logits, encoded_corrupt))\n        results[layer_idx] = metric\n        handle.remove()\n\n    return results\n
+"""
+Activation patching utilities: clean→corrupt residual swaps to localize causal layers.
+"""
+from typing import Any, Dict, List, Optional
+
+import torch
+
+from .hooks import _find_layer_stack
+
+
+def _run_forward(model, tokenizer, prompt: str, device: Optional[str] = None):
+    device = device or str(next(model.parameters()).device)
+    encoded = tokenizer(prompt, return_tensors="pt").to(device)
+    with torch.no_grad():
+        out = model(
+            **encoded,
+            output_hidden_states=True,
+            use_cache=False,
+        )
+    return encoded, out.hidden_states, out.logits
+
+
+def residual_patch_sweep(
+    model: torch.nn.Module,
+    tokenizer: Any,
+    prompt_clean: str,
+    prompt_corrupt: str,
+    target_fn,
+    layer_indices: Optional[List[int]] = None,
+    token_pos: int = -1,
+) -> Dict[int, float]:
+    """
+    For each layer, patch corrupt run with clean residuals and measure target metric delta.
+
+    target_fn: callable(logits, encoded_inputs) -> float
+    returns: {layer_idx: metric_with_patch}
+    """
+    device = str(next(model.parameters()).device)
+    layers = _find_layer_stack(model)
+    if layer_indices is None:
+        layer_indices = list(range(len(layers)))
+
+    encoded_clean, hidden_clean, _ = _run_forward(model, tokenizer, prompt_clean, device)
+    encoded_corrupt, _, _ = _run_forward(model, tokenizer, prompt_corrupt, device)
+
+    results: Dict[int, float] = {}
+
+    for layer_idx in layer_indices:
+        # Patch hook
+        def make_hook(clean_tensor):
+            def hook(_mod, _inp, out):
+                if not torch.is_tensor(out):
+                    return out
+                patched = out.clone()
+                patched[:, token_pos, :] = clean_tensor[:, token_pos, :]
+                return patched
+            return hook
+
+        handle = layers[layer_idx].register_forward_hook(make_hook(hidden_clean[layer_idx]))
+        with torch.no_grad():
+            out = model(
+                **encoded_corrupt,
+                output_hidden_states=False,
+                use_cache=False,
+            )
+        metric = float(target_fn(out.logits, encoded_corrupt))
+        results[layer_idx] = metric
+        handle.remove()
+
+    return results

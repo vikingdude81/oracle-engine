@@ -4,21 +4,21 @@ emoji: 🔮
 colorFrom: indigo
 colorTo: purple
 sdk: gradio
-sdk_version: 4.44.0
+sdk_version: 6.3.0
 app_file: app.py
 pinned: true
 license: mit
 suggested_hardware: a100-large
 models:
-  - unsloth/Qwen2.5-32B-Instruct-bnb-4bit
+- unsloth/Qwen2.5-32B-Instruct-bnb-4bit
 tags:
-  - consciousness
-  - interpretability
-  - transformers
-  - meta-cognition
-  - qwen
-  - 32b
-  - fine-tuned
+- consciousness
+- interpretability
+- transformers
+- meta-cognition
+- qwen
+- 32b
+- fine-tuned
 short_description: 32B model with consciousness measurement circuit
 ---
 
@@ -43,7 +43,7 @@ Probe the depths of meta-cognitive processing in a model fine-tuned on 200,000 e
 ### 3-Stage Progressive Fine-Tuning
 
 | Stage | Dataset | Examples | Purpose |
-|-------|---------|----------|---------|
+|-------|---------|----------|----------|
 | 1 | **OpenHermes 2.5** | 100,000 | Instruction following |
 | 2 | **MetaMathQA** | 50,000 | Mathematical reasoning |
 | 3 | **Magicoder-OSS-Instruct** | 50,000 | Code generation |

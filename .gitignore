@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs and temp
+*.log
+*.pid
+tmpclaude-*
+NUL
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Model weights (large files)
+*.bin
+*.safetensors
+*.pt
+*.gguf

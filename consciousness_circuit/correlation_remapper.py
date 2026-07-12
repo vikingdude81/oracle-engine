@@ -100,7 +100,7 @@ class CorrelationRemapper:
                 try:
                     # HuggingFace style
                     n_layers = model.config.num_hidden_layers
-                except:
+                except (AttributeError, KeyError, TypeError):
                     n_layers = 12  # Default fallback
 
             layer_idx = int(n_layers * self.layer_fraction)

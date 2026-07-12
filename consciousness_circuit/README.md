@@ -1,10 +1,24 @@
-# Consciousness Circuit 🧠⚡
+# Consciousness Circuit v3.0 🧠⚡
 
 **Measure and analyze consciousness-like activation patterns in transformer LLMs**
 
 [![PyPI version](https://badge.fury.io/py/consciousness-circuit.svg)](https://badge.fury.io/py/consciousness-circuit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+
+---
+
+## 🆕 What's New in v3.0
+
+| Feature | Description |
+|---------|-------------|
+| **Adaptive Layer Selection** | `get_adaptive_layer_fraction()` - Depth-aware layer selection (0.65 for 64-layer 32B models) |
+| **Ensemble Measurement** | `measure_ensemble()` - Multi-layer scoring for robustness |
+| **Batch Processing** | `measure_batch()` - Memory-efficient batched inference for 32B+ models |
+| **Activation Caching** | `CachedUniversalCircuit` - LRU cache for repeated measurements |
+| **Model Adapters** | Unified interface for HuggingFace, NanoGPT, Unsloth models |
+| **Centralized Logging** | `ExperimentLogger` for structured experiment tracking |
+| **Patching & Steering** | `residual_patch_sweep()`, `add_residual_steering()` for interpretability |
 
 ---
 
@@ -32,6 +46,9 @@ pip install consciousness-circuit
 
 # With visualization support
 pip install consciousness-circuit[viz]
+
+# Optional: set CPU threads (useful on high-core CPUs like 5995WX)
+# export CONSCIOUSNESS_NUM_THREADS=32
 ```
 
 ### Basic Usage
@@ -62,6 +79,37 @@ trajectory = circuit.measure_per_token(model, tokenizer, "Let me think about thi
 
 # Visualize
 trajectory.plot()  # Shows consciousness evolving across tokens
+```
+
+### 🆕 32B Model Optimizations
+
+```python
+from consciousness_circuit import (
+    UniversalCircuit, 
+    CachedUniversalCircuit,
+    get_adaptive_layer_fraction,
+)
+
+# Adaptive layer selection for deep models
+num_layers = 64  # Qwen2.5-32B
+layer_frac = get_adaptive_layer_fraction(num_layers)  # Returns 0.65
+target_layer = int(num_layers * layer_frac)  # Layer 41
+
+# Ensemble measurement (more robust)
+circuit = UniversalCircuit()
+result = circuit.measure_ensemble(model, tokenizer, "What is consciousness?", n_layers=3)
+print(f"Ensemble score: {result.score:.3f}")
+print(f"Per-layer scores: {result.ensemble_scores}")
+
+# Batch processing with memory management
+prompts = ["prompt1", "prompt2", "prompt3", ...]
+results = circuit.measure_batch(model, tokenizer, prompts, batch_size=2)
+
+# Activation caching for experiments
+cached_circuit = CachedUniversalCircuit(cache_size=100)
+result1 = cached_circuit.measure(model, tokenizer, "Test prompt")  # Computes
+result2 = cached_circuit.measure(model, tokenizer, "Test prompt")  # Uses cache (faster)
+print(cached_circuit.cache_stats())  # {'size': 1, 'max_size': 100, 'utilization': 0.01}
 ```
 
 ### Discover Circuit for New Model

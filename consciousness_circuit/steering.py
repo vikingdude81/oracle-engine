@@ -1,1 +1,48 @@
-"""\nResidual steering utilities: apply probe/feature directions with norm caps.\n"""\nfrom dataclasses import dataclass\nfrom typing import Optional\n\nimport torch\n\nfrom .hooks import _find_layer_stack\n\n\n@dataclass\nclass SteeringConfig:\n    layer_idx: int\n    alpha: float = 1.0\n    token_pos: int = -1  # last token by default\n    max_norm: Optional[float] = None\n\n\ndef add_residual_steering(\n    model: torch.nn.Module,\n    direction: torch.Tensor,\n    config: SteeringConfig,\n) -> torch.utils.hooks.RemovableHandle:\n    """\n    Adds direction to residual stream at the specified layer/token position.\n    direction is expected to be 1D (hidden_dim,) or broadcastable.\n    """\n    layers = _find_layer_stack(model)\n    target = layers[config.layer_idx]\n    device = next(model.parameters()).device\n    direction = direction.to(device)\n\n    def hook(_mod, _inp, out):\n        if not torch.is_tensor(out):\n            return out\n        delta = direction\n        if config.max_norm:\n            norm = torch.norm(delta)\n            if norm > config.max_norm:\n                delta = delta * (config.max_norm / (norm + 1e-8))\n        if out.dim() == 3:\n            out = out.clone()\n            out[:, config.token_pos, :] += config.alpha * delta\n            return out\n        return out\n\n    return target.register_forward_hook(hook)\n
+"""
+Residual steering utilities: apply probe/feature directions with norm caps.
+"""
+from dataclasses import dataclass
+from typing import Optional
+
+import torch
+
+from .hooks import _find_layer_stack
+
+
+@dataclass
+class SteeringConfig:
+    layer_idx: int
+    alpha: float = 1.0
+    token_pos: int = -1  # last token by default
+    max_norm: Optional[float] = None
+
+
+def add_residual_steering(
+    model: torch.nn.Module,
+    direction: torch.Tensor,
+    config: SteeringConfig,
+) -> torch.utils.hooks.RemovableHandle:
+    """
+    Adds direction to residual stream at the specified layer/token position.
+    direction is expected to be 1D (hidden_dim,) or broadcastable.
+    """
+    layers = _find_layer_stack(model)
+    target = layers[config.layer_idx]
+    device = next(model.parameters()).device
+    direction = direction.to(device)
+
+    def hook(_mod, _inp, out):
+        if not torch.is_tensor(out):
+            return out
+        delta = direction
+        if config.max_norm:
+            norm = torch.norm(delta)
+            if norm > config.max_norm:
+                delta = delta * (config.max_norm / (norm + 1e-8))
+        if out.dim() == 3:
+            out = out.clone()
+            out[:, config.token_pos, :] += config.alpha * delta
+            return out
+        return out
+
+    return target.register_forward_hook(hook)

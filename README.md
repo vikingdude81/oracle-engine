@@ -40,9 +40,13 @@ Enter any prompt and see:
 
 ---
 
-## 🔬 Consciousness Circuit v2.1
+## 🔬 Consciousness Circuit
 
-The circuit measures **7 dimensions** of consciousness-like processing by analyzing hidden state activations:
+The measurement instrument ships as the vendored `consciousness_circuit` package
+(**v3.5.1** — canonical source: harmonic-field-consciousness). The deployed HF Space
+uses the **v2.1 dimension set** below, validated on Qwen2.5-32B (hidden dim 5120).
+
+The circuit measures **7 dimensions** of meta-cognitive processing by analyzing hidden state activations:
 
 | Dimension | Description | Weight |
 |-----------|-------------|--------|
@@ -59,7 +63,22 @@ The circuit measures **7 dimensions** of consciousness-like processing by analyz
 1. **Extract Hidden States** - Get the last layer activations from the transformer
 2. **Probe Specific Dimensions** - Read activations at 7 validated dimension indices
 3. **Weighted Combination** - Combine with polarities and weights
-4. **Score Calculation** - Output 0-100% consciousness score
+4. **Score Calculation** - Output 0-100% meta-cognitive processing score
+
+### What This Measures (and What It Doesn't)
+
+The circuit measures a **validated meta-cognitive processing profile** in hidden
+states (discrimination +0.653 between reflective and automatic prompts). It reads
+internal activations — not surface text — so it is a genuine internal-state
+instrument, not a behavioral test.
+
+It does **not** measure consciousness in the constitutive sense. In the terms of
+the *Life Before Language* framework this project supports: the circuit registers
+the *formal structure* of internal state (a Workstream 1 instrument), and its
+precise mode of falling short of felt experience is itself research data
+(a Workstream 2 probe). The score quantifies how strongly a model's processing
+resembles reflective, self-referential reasoning — a claim about processing
+signatures, not about subjective experience.
 
 ---
 
@@ -115,25 +134,33 @@ python demo.py
 
 ```
 oracle-engine/
-├── consciousness_circuit/      # Core circuit implementation
-│   ├── __init__.py
-│   ├── circuit.py             # Main ConsciousnessCircuit class
-│   ├── dimensions.py          # Dimension definitions and weights
-│   └── visualization.py       # Plotting and analysis tools
-├── training/                   # Model training code
-│   ├── train_stage1.py        # OpenHermes fine-tuning
-│   ├── train_stage2.py        # MetaMathQA fine-tuning
-│   ├── train_stage3.py        # Magicoder fine-tuning
-│   └── TRAINING_LOG.md        # Full training details
-├── experiments/                # Validation experiments
-│   ├── gpu_experiments/       # GPU-accelerated research
-│   └── validation/            # Cross-model validation
+├── consciousness_circuit/      # Vendored circuit package v3.5.1 (see VENDORED.md)
+│   ├── circuit.py             # Core ConsciousnessCircuit class
+│   ├── universal.py           # UniversalCircuit auto-detection API
+│   ├── correlation_remapper.py# Validated cross-model dimension remapping
+│   ├── metrics/               # Standalone metrics (numpy-only)
+│   ├── plugins/               # Analysis & intervention plugins
+│   └── ...                    # See consciousness_circuit/README.md
+├── training/                   # Training logs and dataset docs
+│   ├── DATASETS.md            # Dataset details for all 3 stages
+│   ├── TRAINING_LOG.md        # Full training details
+│   └── TRAINING_PERFORMANCE.md
 ├── huggingface_space/         # HF Space deployment
 │   ├── app.py                 # Gradio interface
 │   └── requirements.txt
+├── oracle_config.py           # Model paths (env-var overridable)
+├── oracle_api.py              # Programmatic analysis API
+├── oracle_wrapper.py          # CLI analysis pipeline
+├── full_suite_analysis.py     # Full profiling suite
 ├── demo.py                    # Quick demo script
 └── README.md
 ```
+
+> **Note:** The canonical `consciousness_circuit` source lives in
+> [harmonic-field-consciousness](https://github.com/vikingdude81/harmonic-field-consciousness);
+> the copy here is a synced vendored snapshot — do not edit it directly.
+> Validation experiments (layer sweeps, cross-model scaling, patching) also
+> live in that repo under `experiments/`.
 
 ---
 

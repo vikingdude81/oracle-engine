@@ -1,1 +1,427 @@
-"""\nModel Adapters for Consciousness Circuit\n=========================================\n\nProvides a unified interface for different model types:\n- HuggingFace Transformers (AutoModel, AutoModelForCausalLM)\n- NanoGPT (HarmonicGPT V5/V6)\n- Unsloth (FastLanguageModel)\n\nThis decouples the consciousness measurement code from specific model implementations.\n\nUsage:\n    from consciousness_circuit.model_adapters import create_adapter\n\n    # Auto-detect model type\n    adapter = create_adapter(model, tokenizer)\n\n    # Get hidden states\n    hidden_states = adapter.get_hidden_states(prompt)\n\n    # Get model info\n    print(f\"Hidden size: {adapter.hidden_size}\")\n    print(f\"Num layers: {adapter.num_layers}\")\n"""\n\nimport torch\nimport torch.nn as nn\nfrom abc import ABC, abstractmethod\nfrom typing import List, Tuple, Optional, Dict, Any, Union\nfrom dataclasses import dataclass\n\ntry:\n    from .logging_config import get_logger\n    logger = get_logger(__name__)\nexcept ImportError:\n    import logging\n    logger = logging.getLogger(__name__)\n\n\n@dataclass\nclass ModelInfo:\n    \"\"\"Information about a model.\"\"\"\n    hidden_size: int\n    num_layers: int\n    model_type: str\n    device: str\n    dtype: torch.dtype\n\n\nclass ModelAdapter(ABC):\n    \"\"\"\n    Abstract base class for model adapters.\n\n    All adapters must implement:\n    - get_hidden_states(): Extract hidden states from a prompt\n    - forward(): Run forward pass with optional hidden state output\n    - generate(): Generate text (optional)\n    \"\"\"\n\n    def __init__(self, model: nn.Module, tokenizer: Any):\n        self.model = model\n        self.tokenizer = tokenizer\n        self._info: Optional[ModelInfo] = None\n\n    @property\n    @abstractmethod\n    def hidden_size(self) -> int:\n        \"\"\"Return the model's hidden dimension size.\"\"\"\n        pass\n\n    @property\n    @abstractmethod\n    def num_layers(self) -> int:\n        \"\"\"Return the number of transformer layers.\"\"\"\n        pass\n\n    @property\n    def device(self) -> torch.device:\n        \"\"\"Return the model's device.\"\"\"\n        return next(self.model.parameters()).device\n\n    @property\n    def dtype(self) -> torch.dtype:\n        \"\"\"Return the model's dtype.\"\"\"\n        return next(self.model.parameters()).dtype\n\n    @abstractmethod\n    def get_hidden_states(\n        self,\n        prompt: str,\n        layer_indices: Optional[List[int]] = None,\n    ) -> List[torch.Tensor]:\n        \"\"\"\n        Get hidden states for a prompt.\n\n        Args:\n            prompt: Input text\n            layer_indices: Specific layers to return (None = all layers)\n\n        Returns:\n            List of hidden state tensors, one per requested layer\n            Each tensor has shape (batch=1, seq_len, hidden_size)\n        \"\"\"\n        pass\n\n    @abstractmethod\n    def forward(\n        self,\n        input_ids: torch.Tensor,\n        output_hidden_states: bool = False,\n    ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:\n        \"\"\"\n        Run forward pass.\n\n        Args:\n            input_ids: Token IDs (batch, seq_len)\n            output_hidden_states: Whether to return hidden states\n\n        Returns:\n            (logits, hidden_states) where hidden_states is None if not requested\n        \"\"\"\n        pass\n\n    def tokenize(self, prompt: str) -> torch.Tensor:\n        \"\"\"Tokenize a prompt and return input_ids on model device.\"\"\"\n        if hasattr(self.tokenizer, 'encode'):\n            # tiktoken style\n            input_ids = torch.tensor([self.tokenizer.encode(prompt)], device=self.device)\n        else:\n            # HuggingFace style\n            inputs = self.tokenizer(prompt, return_tensors=\"pt\")\n            input_ids = inputs[\"input_ids\"].to(self.device)\n        return input_ids\n\n    def get_info(self) -> ModelInfo:\n        \"\"\"Get model information.\"\"\"\n        if self._info is None:\n            self._info = ModelInfo(\n                hidden_size=self.hidden_size,\n                num_layers=self.num_layers,\n                model_type=self.__class__.__name__,\n                device=str(self.device),\n                dtype=self.dtype,\n            )\n        return self._info\n\n\nclass HuggingFaceAdapter(ModelAdapter):\n    \"\"\"\n    Adapter for HuggingFace Transformers models.\n\n    Works with:\n    - AutoModelForCausalLM\n    - AutoModel\n    - Qwen2ForCausalLM\n    - LlamaForCausalLM\n    - etc.\n    \"\"\"\n\n    @property\n    def hidden_size(self) -> int:\n        if hasattr(self.model.config, 'hidden_size'):\n            return self.model.config.hidden_size\n        elif hasattr(self.model.config, 'd_model'):\n            return self.model.config.d_model\n        raise ValueError(\"Could not determine hidden_size from model config\")\n\n    @property\n    def num_layers(self) -> int:\n        if hasattr(self.model.config, 'num_hidden_layers'):\n            return self.model.config.num_hidden_layers\n        elif hasattr(self.model.config, 'n_layer'):\n            return self.model.config.n_layer\n        raise ValueError(\"Could not determine num_layers from model config\")\n\n    def get_hidden_states(\n        self,\n        prompt: str,\n        layer_indices: Optional[List[int]] = None,\n    ) -> List[torch.Tensor]:\n        input_ids = self.tokenize(prompt)\n\n        self.model.eval()\n        with torch.no_grad():\n            outputs = self.model(input_ids, output_hidden_states=True, return_dict=True)\n\n        all_hidden = outputs.hidden_states  # Tuple of (batch, seq, hidden)\n\n        if layer_indices is None:\n            return list(all_hidden)\n        else:\n            return [all_hidden[i] for i in layer_indices if i < len(all_hidden)]\n\n    def forward(\n        self,\n        input_ids: torch.Tensor,\n        output_hidden_states: bool = False,\n    ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:\n        self.model.eval()\n        with torch.no_grad():\n            outputs = self.model(\n                input_ids,\n                output_hidden_states=output_hidden_states,\n                return_dict=True\n            )\n\n        logits = outputs.logits\n        hidden_states = list(outputs.hidden_states) if output_hidden_states else None\n\n        return logits, hidden_states\n\n\nclass NanoGPTAdapter(ModelAdapter):\n    \"\"\"\n    Adapter for NanoGPT models (HarmonicGPT V3/V4/V5/V6).\n\n    Works with:\n    - HarmonicGPTV5\n    - HarmonicGPTV6\n    - GPT (base NanoGPT)\n    - ConsciousnessWrapper\n    \"\"\"\n\n    def __init__(self, model: nn.Module, tokenizer: Any):\n        super().__init__(model, tokenizer)\n\n        # Unwrap if it's a ConsciousnessWrapper\n        if hasattr(model, 'base_model'):\n            self._base_model = model.base_model\n            self._is_wrapped = True\n        else:\n            self._base_model = model\n            self._is_wrapped = False\n\n    @property\n    def hidden_size(self) -> int:\n        # NanoGPT uses config dict or n_embd attribute\n        if hasattr(self._base_model, 'config'):\n            config = self._base_model.config\n            if isinstance(config, dict):\n                return config.get('n_embd', 768)\n            else:\n                return getattr(config, 'n_embd', 768)\n        elif hasattr(self._base_model, 'n_embd'):\n            return self._base_model.n_embd\n        return 768  # Default\n\n    @property\n    def num_layers(self) -> int:\n        if hasattr(self._base_model, 'config'):\n            config = self._base_model.config\n            if isinstance(config, dict):\n                return config.get('n_layer', 12)\n            else:\n                return getattr(config, 'n_layer', 12)\n        elif hasattr(self._base_model, 'n_layer'):\n            return self._base_model.n_layer\n\n        # Try to count transformer blocks\n        if hasattr(self._base_model, 'transformer') and hasattr(self._base_model.transformer, 'h'):\n            return len(self._base_model.transformer.h)\n        elif hasattr(self._base_model, 'blocks'):\n            return len(self._base_model.blocks)\n\n        return 12  # Default\n\n    def get_hidden_states(\n        self,\n        prompt: str,\n        layer_indices: Optional[List[int]] = None,\n    ) -> List[torch.Tensor]:\n        input_ids = self.tokenize(prompt)\n        _, hidden_states = self.forward(input_ids, output_hidden_states=True)\n\n        if hidden_states is None:\n            return []\n\n        if layer_indices is None:\n            return hidden_states\n        else:\n            return [hidden_states[i] for i in layer_indices if i < len(hidden_states)]\n\n    def forward(\n        self,\n        input_ids: torch.Tensor,\n        output_hidden_states: bool = False,\n    ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:\n        self._base_model.eval()\n\n        if output_hidden_states:\n            # Need to use hooks to capture hidden states\n            hidden_states = []\n\n            def hook_fn(module, input, output):\n                if isinstance(output, tuple):\n                    hidden_states.append(output[0].detach())\n                else:\n                    hidden_states.append(output.detach())\n\n            # Register hooks on transformer blocks\n            hooks = []\n            if hasattr(self._base_model, 'transformer') and hasattr(self._base_model.transformer, 'h'):\n                for block in self._base_model.transformer.h:\n                    hooks.append(block.register_forward_hook(hook_fn))\n            elif hasattr(self._base_model, 'blocks'):\n                for block in self._base_model.blocks:\n                    hooks.append(block.register_forward_hook(hook_fn))\n\n            try:\n                with torch.no_grad():\n                    logits = self._base_model(input_ids)\n                    if isinstance(logits, tuple):\n                        logits = logits[0]\n            finally:\n                # Remove hooks\n                for hook in hooks:\n                    hook.remove()\n\n            return logits, hidden_states\n        else:\n            with torch.no_grad():\n                logits = self._base_model(input_ids)\n                if isinstance(logits, tuple):\n                    logits = logits[0]\n            return logits, None\n\n\nclass UnslothAdapter(HuggingFaceAdapter):\n    \"\"\"\n    Adapter for Unsloth FastLanguageModel.\n\n    Unsloth models are HuggingFace-compatible but may have\n    slightly different behaviors for quantized models.\n    \"\"\"\n\n    def __init__(self, model: nn.Module, tokenizer: Any):\n        super().__init__(model, tokenizer)\n        logger.info(\"Using Unsloth adapter for quantized model\")\n\n    # Inherits all methods from HuggingFaceAdapter\n    # Can override specific methods if needed for quantization handling\n\n\ndef detect_model_type(model: nn.Module) -> str:\n    \"\"\"\n    Detect the type of model.\n\n    Returns:\n        \"huggingface\", \"nanogpt\", \"unsloth\", or \"unknown\"\n    \"\"\"\n    # Check for Unsloth\n    model_name = getattr(model.config, '_name_or_path', '') if hasattr(model, 'config') else ''\n    if 'unsloth' in model_name.lower() or 'bnb' in model_name.lower():\n        return \"unsloth\"\n\n    # Check for HuggingFace\n    if hasattr(model, 'config') and hasattr(model.config, 'model_type'):\n        return \"huggingface\"\n\n    # Check for NanoGPT\n    if hasattr(model, 'transformer') and hasattr(model.transformer, 'h'):\n        return \"nanogpt\"\n    if hasattr(model, 'blocks') and hasattr(model, 'tok_emb'):\n        return \"nanogpt\"\n\n    # Check for ConsciousnessWrapper\n    if hasattr(model, 'base_model'):\n        return \"nanogpt\"\n\n    return \"unknown\"\n\n\ndef create_adapter(\n    model: nn.Module,\n    tokenizer: Any,\n    model_type: Optional[str] = None,\n) -> ModelAdapter:\n    \"\"\"\n    Create the appropriate adapter for a model.\n\n    Args:\n        model: The model instance\n        tokenizer: The tokenizer\n        model_type: Override auto-detection (\"huggingface\", \"nanogpt\", \"unsloth\")\n\n    Returns:\n        ModelAdapter instance\n\n    Example:\n        adapter = create_adapter(model, tokenizer)\n        hidden_states = adapter.get_hidden_states(\"What is consciousness?\")\n    \"\"\"\n    if model_type is None:\n        model_type = detect_model_type(model)\n\n    logger.info(f\"Creating adapter for model type: {model_type}\")\n\n    if model_type == \"huggingface\":\n        return HuggingFaceAdapter(model, tokenizer)\n    elif model_type == \"nanogpt\":\n        return NanoGPTAdapter(model, tokenizer)\n    elif model_type == \"unsloth\":\n        return UnslothAdapter(model, tokenizer)\n    else:\n        # Default to HuggingFace\n        logger.warning(f\"Unknown model type '{model_type}', defaulting to HuggingFace adapter\")\n        return HuggingFaceAdapter(model, tokenizer)\n\n\n# Convenience function\ndef get_hidden_states(\n    model: nn.Module,\n    tokenizer: Any,\n    prompt: str,\n    layer_indices: Optional[List[int]] = None,\n) -> List[torch.Tensor]:\n    \"\"\"\n    Quick function to get hidden states from any model.\n\n    Args:\n        model: Any supported model\n        tokenizer: The tokenizer\n        prompt: Input text\n        layer_indices: Specific layers (None = all)\n\n    Returns:\n        List of hidden state tensors\n    \"\"\"\n    adapter = create_adapter(model, tokenizer)\n    return adapter.get_hidden_states(prompt, layer_indices)\n
+"""
+Model Adapters for Consciousness Circuit
+=========================================
+
+Provides a unified interface for different model types:
+- HuggingFace Transformers (AutoModel, AutoModelForCausalLM)
+- NanoGPT (HarmonicGPT V5/V6)
+- Unsloth (FastLanguageModel)
+
+This decouples the consciousness measurement code from specific model implementations.
+
+Usage:
+    from consciousness_circuit.model_adapters import create_adapter
+
+    # Auto-detect model type
+    adapter = create_adapter(model, tokenizer)
+
+    # Get hidden states
+    hidden_states = adapter.get_hidden_states(prompt)
+
+    # Get model info
+    print(f"Hidden size: {adapter.hidden_size}")
+    print(f"Num layers: {adapter.num_layers}")
+"""
+
+import torch
+import torch.nn as nn
+from abc import ABC, abstractmethod
+from typing import List, Tuple, Optional, Dict, Any, Union
+from dataclasses import dataclass
+
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
+@dataclass
+class ModelInfo:
+    """Information about a model."""
+    hidden_size: int
+    num_layers: int
+    model_type: str
+    device: str
+    dtype: torch.dtype
+
+
+class ModelAdapter(ABC):
+    """
+    Abstract base class for model adapters.
+
+    All adapters must implement:
+    - get_hidden_states(): Extract hidden states from a prompt
+    - forward(): Run forward pass with optional hidden state output
+    - generate(): Generate text (optional)
+    """
+
+    def __init__(self, model: nn.Module, tokenizer: Any):
+        self.model = model
+        self.tokenizer = tokenizer
+        self._info: Optional[ModelInfo] = None
+
+    @property
+    @abstractmethod
+    def hidden_size(self) -> int:
+        """Return the model's hidden dimension size."""
+        pass
+
+    @property
+    @abstractmethod
+    def num_layers(self) -> int:
+        """Return the number of transformer layers."""
+        pass
+
+    @property
+    def device(self) -> torch.device:
+        """Return the model's device."""
+        return next(self.model.parameters()).device
+
+    @property
+    def dtype(self) -> torch.dtype:
+        """Return the model's dtype."""
+        return next(self.model.parameters()).dtype
+
+    @abstractmethod
+    def get_hidden_states(
+        self,
+        prompt: str,
+        layer_indices: Optional[List[int]] = None,
+    ) -> List[torch.Tensor]:
+        """
+        Get hidden states for a prompt.
+
+        Args:
+            prompt: Input text
+            layer_indices: Specific layers to return (None = all layers)
+
+        Returns:
+            List of hidden state tensors, one per requested layer
+            Each tensor has shape (batch=1, seq_len, hidden_size)
+        """
+        pass
+
+    @abstractmethod
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        output_hidden_states: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:
+        """
+        Run forward pass.
+
+        Args:
+            input_ids: Token IDs (batch, seq_len)
+            output_hidden_states: Whether to return hidden states
+
+        Returns:
+            (logits, hidden_states) where hidden_states is None if not requested
+        """
+        pass
+
+    def tokenize(self, prompt: str) -> torch.Tensor:
+        """Tokenize a prompt and return input_ids on model device."""
+        if hasattr(self.tokenizer, 'encode'):
+            # tiktoken style
+            input_ids = torch.tensor([self.tokenizer.encode(prompt)], device=self.device)
+        else:
+            # HuggingFace style
+            inputs = self.tokenizer(prompt, return_tensors="pt")
+            input_ids = inputs["input_ids"].to(self.device)
+        return input_ids
+
+    def get_info(self) -> ModelInfo:
+        """Get model information."""
+        if self._info is None:
+            self._info = ModelInfo(
+                hidden_size=self.hidden_size,
+                num_layers=self.num_layers,
+                model_type=self.__class__.__name__,
+                device=str(self.device),
+                dtype=self.dtype,
+            )
+        return self._info
+
+
+class HuggingFaceAdapter(ModelAdapter):
+    """
+    Adapter for HuggingFace Transformers models.
+
+    Works with:
+    - AutoModelForCausalLM
+    - AutoModel
+    - Qwen2ForCausalLM
+    - LlamaForCausalLM
+    - etc.
+    """
+
+    @property
+    def hidden_size(self) -> int:
+        if hasattr(self.model.config, 'hidden_size'):
+            return self.model.config.hidden_size
+        elif hasattr(self.model.config, 'd_model'):
+            return self.model.config.d_model
+        raise ValueError("Could not determine hidden_size from model config")
+
+    @property
+    def num_layers(self) -> int:
+        if hasattr(self.model.config, 'num_hidden_layers'):
+            return self.model.config.num_hidden_layers
+        elif hasattr(self.model.config, 'n_layer'):
+            return self.model.config.n_layer
+        raise ValueError("Could not determine num_layers from model config")
+
+    def get_hidden_states(
+        self,
+        prompt: str,
+        layer_indices: Optional[List[int]] = None,
+    ) -> List[torch.Tensor]:
+        input_ids = self.tokenize(prompt)
+
+        self.model.eval()
+        with torch.no_grad():
+            outputs = self.model(input_ids, output_hidden_states=True, return_dict=True)
+
+        all_hidden = outputs.hidden_states  # Tuple of (batch, seq, hidden)
+
+        if layer_indices is None:
+            return list(all_hidden)
+        else:
+            return [all_hidden[i] for i in layer_indices if i < len(all_hidden)]
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        output_hidden_states: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:
+        self.model.eval()
+        with torch.no_grad():
+            outputs = self.model(
+                input_ids,
+                output_hidden_states=output_hidden_states,
+                return_dict=True
+            )
+
+        logits = outputs.logits
+        hidden_states = list(outputs.hidden_states) if output_hidden_states else None
+
+        return logits, hidden_states
+
+
+class NanoGPTAdapter(ModelAdapter):
+    """
+    Adapter for NanoGPT models (HarmonicGPT V3/V4/V5/V6).
+
+    Works with:
+    - HarmonicGPTV5
+    - HarmonicGPTV6
+    - GPT (base NanoGPT)
+    - ConsciousnessWrapper
+    """
+
+    def __init__(self, model: nn.Module, tokenizer: Any):
+        super().__init__(model, tokenizer)
+
+        # Unwrap if it's a ConsciousnessWrapper
+        if hasattr(model, 'base_model'):
+            self._base_model = model.base_model
+            self._is_wrapped = True
+        else:
+            self._base_model = model
+            self._is_wrapped = False
+
+    @property
+    def hidden_size(self) -> int:
+        # NanoGPT uses config dict or n_embd attribute
+        if hasattr(self._base_model, 'config'):
+            config = self._base_model.config
+            if isinstance(config, dict):
+                return config.get('n_embd', 768)
+            else:
+                return getattr(config, 'n_embd', 768)
+        elif hasattr(self._base_model, 'n_embd'):
+            return self._base_model.n_embd
+        return 768  # Default
+
+    @property
+    def num_layers(self) -> int:
+        if hasattr(self._base_model, 'config'):
+            config = self._base_model.config
+            if isinstance(config, dict):
+                return config.get('n_layer', 12)
+            else:
+                return getattr(config, 'n_layer', 12)
+        elif hasattr(self._base_model, 'n_layer'):
+            return self._base_model.n_layer
+
+        # Try to count transformer blocks
+        if hasattr(self._base_model, 'transformer') and hasattr(self._base_model.transformer, 'h'):
+            return len(self._base_model.transformer.h)
+        elif hasattr(self._base_model, 'blocks'):
+            return len(self._base_model.blocks)
+
+        return 12  # Default
+
+    def get_hidden_states(
+        self,
+        prompt: str,
+        layer_indices: Optional[List[int]] = None,
+    ) -> List[torch.Tensor]:
+        input_ids = self.tokenize(prompt)
+        _, hidden_states = self.forward(input_ids, output_hidden_states=True)
+
+        if hidden_states is None:
+            return []
+
+        if layer_indices is None:
+            return hidden_states
+        else:
+            return [hidden_states[i] for i in layer_indices if i < len(hidden_states)]
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        output_hidden_states: bool = False,
+    ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:
+        self._base_model.eval()
+
+        if output_hidden_states:
+            # Need to use hooks to capture hidden states
+            hidden_states = []
+
+            def hook_fn(module, input, output):
+                if isinstance(output, tuple):
+                    hidden_states.append(output[0].detach())
+                else:
+                    hidden_states.append(output.detach())
+
+            # Register hooks on transformer blocks
+            hooks = []
+            if hasattr(self._base_model, 'transformer') and hasattr(self._base_model.transformer, 'h'):
+                for block in self._base_model.transformer.h:
+                    hooks.append(block.register_forward_hook(hook_fn))
+            elif hasattr(self._base_model, 'blocks'):
+                for block in self._base_model.blocks:
+                    hooks.append(block.register_forward_hook(hook_fn))
+
+            try:
+                with torch.no_grad():
+                    logits = self._base_model(input_ids)
+                    if isinstance(logits, tuple):
+                        logits = logits[0]
+            finally:
+                # Remove hooks
+                for hook in hooks:
+                    hook.remove()
+
+            return logits, hidden_states
+        else:
+            with torch.no_grad():
+                logits = self._base_model(input_ids)
+                if isinstance(logits, tuple):
+                    logits = logits[0]
+            return logits, None
+
+
+class UnslothAdapter(HuggingFaceAdapter):
+    """
+    Adapter for Unsloth FastLanguageModel.
+
+    Unsloth models are HuggingFace-compatible but may have
+    slightly different behaviors for quantized models.
+    """
+
+    def __init__(self, model: nn.Module, tokenizer: Any):
+        super().__init__(model, tokenizer)
+        logger.info("Using Unsloth adapter for quantized model")
+
+    # Inherits all methods from HuggingFaceAdapter
+    # Can override specific methods if needed for quantization handling
+
+
+def detect_model_type(model: nn.Module) -> str:
+    """
+    Detect the type of model.
+
+    Returns:
+        "huggingface", "nanogpt", "unsloth", or "unknown"
+    """
+    # Check for Unsloth
+    model_name = getattr(model.config, '_name_or_path', '') if hasattr(model, 'config') else ''
+    if 'unsloth' in model_name.lower() or 'bnb' in model_name.lower():
+        return "unsloth"
+
+    # Check for HuggingFace
+    if hasattr(model, 'config') and hasattr(model.config, 'model_type'):
+        return "huggingface"
+
+    # Check for NanoGPT
+    if hasattr(model, 'transformer') and hasattr(model.transformer, 'h'):
+        return "nanogpt"
+    if hasattr(model, 'blocks') and hasattr(model, 'tok_emb'):
+        return "nanogpt"
+
+    # Check for ConsciousnessWrapper
+    if hasattr(model, 'base_model'):
+        return "nanogpt"
+
+    return "unknown"
+
+
+def create_adapter(
+    model: nn.Module,
+    tokenizer: Any,
+    model_type: Optional[str] = None,
+) -> ModelAdapter:
+    """
+    Create the appropriate adapter for a model.
+
+    Args:
+        model: The model instance
+        tokenizer: The tokenizer
+        model_type: Override auto-detection ("huggingface", "nanogpt", "unsloth")
+
+    Returns:
+        ModelAdapter instance
+
+    Example:
+        adapter = create_adapter(model, tokenizer)
+        hidden_states = adapter.get_hidden_states("What is consciousness?")
+    """
+    if model_type is None:
+        model_type = detect_model_type(model)
+
+    logger.info(f"Creating adapter for model type: {model_type}")
+
+    if model_type == "huggingface":
+        return HuggingFaceAdapter(model, tokenizer)
+    elif model_type == "nanogpt":
+        return NanoGPTAdapter(model, tokenizer)
+    elif model_type == "unsloth":
+        return UnslothAdapter(model, tokenizer)
+    else:
+        # Default to HuggingFace
+        logger.warning(f"Unknown model type '{model_type}', defaulting to HuggingFace adapter")
+        return HuggingFaceAdapter(model, tokenizer)
+
+
+# Convenience function
+def get_hidden_states(
+    model: nn.Module,
+    tokenizer: Any,
+    prompt: str,
+    layer_indices: Optional[List[int]] = None,
+) -> List[torch.Tensor]:
+    """
+    Quick function to get hidden states from any model.
+
+    Args:
+        model: Any supported model
+        tokenizer: The tokenizer
+        prompt: Input text
+        layer_indices: Specific layers (None = all)
+
+    Returns:
+        List of hidden state tensors
+    """
+    adapter = create_adapter(model, tokenizer)
+    return adapter.get_hidden_states(prompt, layer_indices)

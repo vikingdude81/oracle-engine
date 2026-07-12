@@ -4,12 +4,13 @@ Plugin Architecture for Consciousness Analysis
 
 Extensible plugin system for analysis and intervention.
 
-Analysis Plugins (existing):
+Analysis Plugins:
 - TrajectoryPlugin: MSD and motion analysis
 - ChaosPlugin: Lyapunov and Hurst exponents
 - AgencyPlugin: Goal-directedness metrics
+- CompressibilityPlugin: Representational compressibility (Weaver et al. 2026)
 
-Intervention Plugins (new):
+Intervention Plugins:
 - AttractorLockPlugin: Stabilize chaos by nudging toward attractors
 - CoherenceBoostPlugin: Maintain memory by injecting early context
 - GoalDirectorPlugin: Enhance agency by amplifying direction
@@ -36,6 +37,9 @@ from .base import (
 from .attractor_lock import AttractorLockPlugin, AttractorMemory
 from .coherence_boost import CoherenceBoostPlugin
 from .goal_director import GoalDirectorPlugin
+
+# Import analysis plugins (standalone)
+from .compressibility import CompressibilityPlugin
 
 
 # Original analysis plugins (for backward compatibility)
@@ -142,6 +146,7 @@ __all__ = [
     "TrajectoryPlugin",
     "ChaosPlugin",
     "AgencyPlugin",
+    "CompressibilityPlugin",
     # Intervention plugins
     "AttractorLockPlugin",
     "AttractorMemory",

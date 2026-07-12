@@ -46,8 +46,12 @@ class UniversalResult:
     # Ensemble info (optional)
     ensemble_layers: Optional[list] = None
     ensemble_scores: Optional[Dict[int, float]] = None
-    # Trajectory metrics (optional)
-    trajectory_metrics: Optional[Dict[str, Any]] = None
+    # Quality metrics (v3.2)
+    raw_score: Optional[float] = None  # Score before length normalization
+    token_count: Optional[int] = None
+    dimension_diversity: Optional[float] = None  # 0-1, how evenly distributed dimensions are
+    dominant_dimension: Optional[str] = None  # Which dimension dominates the signal
+    anomaly_flags: Optional[list] = None  # List of detected anomalies
 
     @property
     def dimension_contributions(self) -> Dict[str, float]:
@@ -55,31 +59,70 @@ class UniversalResult:
         return self.dimension_scores
 
 
-def get_adaptive_layer_fraction(num_layers: int) -> float:
+def get_adaptive_layer_fraction(num_layers: int, model_name: str = "") -> float:
     """
-    Get optimal layer fraction based on model depth.
+    Get optimal layer fraction based on model depth and architecture.
 
-    Deeper models tend to have consciousness emerge earlier proportionally.
-    These values are heuristics based on analysis of various model sizes.
+    Layer sweep analysis (Feb 2026) across Mistral-7B and Qwen-7B revealed that
+    the CS-SE correlation peaks at architecture-specific depths:
+      - Mistral: peak at ~56% depth (L18/32), significant window 50-59%
+      - Qwen: representations are maximally compressed at 14-93% depth (SE≈0.005),
+              with the CS-SE link spread weakly across the compressed zone
+      - General: the old 75% heuristic misses the peak in most architectures
 
     Args:
         num_layers: Number of transformer layers in the model
+        model_name: Model name/path for architecture-specific selection
 
     Returns:
         Optimal layer fraction (0.0 to 1.0)
     """
+    model_lower = model_name.lower()
+
+    # Architecture-specific fractions based on layer sweep data
+    if "mistral" in model_lower:
+        # Peak CS-SE at 56% depth (L18/32), significant zone L16-L19
+        if num_layers <= 32:
+            return 0.56
+        elif num_layers <= 48:
+            return 0.54
+        else:
+            return 0.52
+    elif "qwen" in model_lower:
+        # Qwen compresses representations to SE≈0.005 at L4-L26 (28 layers)
+        # The CS-SE link is weak but steadily grows through the compressed zone
+        # Use late-compressed zone where SE starts to recover (~85% depth)
+        if num_layers <= 28:
+            return 0.85
+        elif num_layers <= 48:
+            return 0.80
+        else:
+            return 0.75
+    elif "yi" in model_lower:
+        # Yi architecture is similar to Llama; use mid-depth
+        if num_layers <= 32:
+            return 0.65
+        else:
+            return 0.60
+    elif "llama" in model_lower:
+        if num_layers <= 32:
+            return 0.65
+        else:
+            return 0.60
+
+    # General fallback heuristic
     if num_layers <= 12:
         return 0.75  # Small models (GPT-2, etc.)
     elif num_layers <= 24:
-        return 0.72  # Medium models (7B range)
+        return 0.65  # Medium models
     elif num_layers <= 32:
-        return 0.70  # Large models (13B-14B range)
+        return 0.60  # Large models (7B-14B range)
     elif num_layers <= 48:
-        return 0.68  # Very large models (32B range - Qwen2.5-32B has 64 layers)
+        return 0.58  # Very large models
     elif num_layers <= 64:
-        return 0.65  # 32B models with 64 layers
+        return 0.55  # 32B+ models
     else:
-        return 0.60  # 70B+ models
+        return 0.52  # 70B+ models
 
 
 def get_ensemble_layers(num_layers: int, n_layers: int = 3) -> list:
@@ -105,6 +148,283 @@ def get_ensemble_layers(num_layers: int, n_layers: int = 3) -> list:
         fractions = [0.50 + (0.40 * i / (n_layers - 1)) for i in range(n_layers)]
 
     return [int(num_layers * f) for f in fractions]
+
+
+# ============================================================================
+# Scoring Improvements v3.2
+# ============================================================================
+
+# Minimum tokens for reliable measurement
+MIN_RELIABLE_TOKENS = 4
+
+# Length normalization curve: maps token count to a scaling factor
+# Short prompts get boosted less (they genuinely have less context),
+# but we remove the penalty floor that makes 1-token prompts score ~0.1
+def length_normalization_factor(n_tokens: int) -> float:
+    """
+    Compute length-based score adjustment.
+
+    The problem: longer prompts score higher simply because they have
+    more tokens activating the network. This function adjusts scores
+    to compensate.
+
+    Approach: We model the expected "baseline inflation" as a function
+    of token count and subtract it. The adjustment is ADDITIVE, not
+    multiplicative, because the bias is additive (more tokens = higher
+    floor, not higher multiplier).
+
+    Based on experimental data:
+    - 1-token prompts: ~0.12 average (mostly embedding noise)
+    - 5-token prompts: ~0.35 average
+    - 10-token prompts: ~0.45 average
+    - 20+ tokens: ~0.50 (stabilizes)
+
+    We return the expected baseline score for n tokens. The caller
+    subtracts this and re-centers.
+
+    Args:
+        n_tokens: Number of tokens in the input
+
+    Returns:
+        Expected baseline score for this token count
+    """
+    # Logarithmic baseline: rises quickly then plateaus
+    # baseline = floor + scale * (1 - exp(-n/tau))
+    floor = 0.08   # Minimum baseline (even 1 token has some activation)
+    ceiling = 0.48  # Where baseline stabilizes for long inputs
+    tau = 5.0       # Ramp speed
+    baseline = floor + (ceiling - floor) * (1 - np.exp(-n_tokens / tau))
+    return float(baseline)
+
+
+def compute_dimension_diversity(dim_scores: Dict[str, float]) -> Tuple[float, Optional[str]]:
+    """
+    Measure how evenly the consciousness signal is distributed across dimensions.
+
+    Returns a diversity score (0 = one dimension dominates entirely,
+    1 = all dimensions contribute equally) and the name of the dominant dimension.
+
+    Uses normalized entropy: H / H_max where H = -sum(p_i * log(p_i))
+
+    Args:
+        dim_scores: Dictionary of dimension name -> activation value
+
+    Returns:
+        (diversity_score, dominant_dimension_name)
+    """
+    if not dim_scores:
+        return 1.0, None
+
+    abs_scores = {k: abs(v) for k, v in dim_scores.items()}
+    total = sum(abs_scores.values())
+
+    if total < 1e-10:
+        return 1.0, None
+
+    # Normalize to probability distribution
+    probs = [v / total for v in abs_scores.values()]
+
+    # Shannon entropy
+    entropy = -sum(p * np.log(p + 1e-10) for p in probs)
+    max_entropy = np.log(len(probs))
+
+    if max_entropy < 1e-10:
+        return 1.0, None
+
+    diversity = float(entropy / max_entropy)
+
+    # Find dominant dimension
+    dominant = max(abs_scores, key=abs_scores.get)
+
+    return diversity, dominant
+
+
+def detect_anomalies(
+    token_scores: list,
+    dim_scores: Dict[str, float],
+    n_tokens: int,
+) -> list:
+    """
+    Detect anomalous activation patterns that suggest unreliable measurement.
+
+    Checks for:
+    1. Single-token inputs with extreme scores (embedding artifacts)
+    2. Token scores with very high variance (unstable activations)
+    3. All dimensions near-zero (dead activation)
+
+    Args:
+        token_scores: Per-token consciousness scores
+        dim_scores: Dimension contribution scores
+        n_tokens: Number of input tokens
+
+    Returns:
+        List of anomaly flag strings (empty = no anomalies)
+    """
+    flags = []
+
+    # 1. Single-token extreme score
+    # A single token shouldn't score above 0.55 or below 0.15 reliably
+    if n_tokens <= 2 and token_scores:
+        max_score = max(token_scores)
+        min_score = min(token_scores)
+        if max_score > 0.55 or min_score < 0.15:
+            flags.append("single_token_extreme")
+
+    # 2. High variance across tokens suggests instability
+    if len(token_scores) > 2:
+        std = float(np.std(token_scores))
+        if std > 0.2:
+            flags.append("high_token_variance")
+
+    # 3. Dead activation - all dimensions near zero
+    if dim_scores:
+        max_abs = max(abs(v) for v in dim_scores.values())
+        if max_abs < 0.05:
+            flags.append("dead_activation")
+
+    return flags
+
+
+def compute_confidence(
+    n_tokens: int,
+    diversity: float,
+    anomalies: list,
+) -> float:
+    """
+    Compute measurement confidence score.
+
+    Combines token count reliability, dimension diversity, and anomaly detection
+    into a single confidence value.
+
+    Args:
+        n_tokens: Number of input tokens
+        diversity: Dimension diversity score (0-1)
+        anomalies: List of detected anomaly flags
+
+    Returns:
+        Confidence score in [0.0, 1.0]
+    """
+    # Token count confidence: ramps from 0.3 (1 token) to 1.0 (10+ tokens)
+    token_conf = min(1.0, 0.3 + 0.7 * (n_tokens / 10.0))
+
+    # Diversity confidence: low diversity = less reliable
+    div_conf = 0.5 + 0.5 * diversity
+
+    # Anomaly penalty: each anomaly reduces confidence
+    anomaly_penalty = 0.15 * len(anomalies)
+
+    confidence = (token_conf * 0.5 + div_conf * 0.5) - anomaly_penalty
+    return max(0.0, min(1.0, confidence))
+
+
+def entropy_weight_tokens(
+    hidden_seq: 'torch.Tensor',
+) -> np.ndarray:
+    """
+    Compute per-token weights based on activation entropy.
+
+    Tokens with higher entropy (more information content) in their hidden
+    state get weighted more heavily. This reduces the influence of padding-like
+    or repetitive tokens.
+
+    Args:
+        hidden_seq: Hidden states tensor [seq_len, hidden_size]
+
+    Returns:
+        Normalized weight array of shape [seq_len], sums to 1.0
+    """
+    seq_len = hidden_seq.shape[0]
+    if seq_len <= 1:
+        return np.ones(1)
+
+    entropies = []
+    for pos in range(seq_len):
+        h = hidden_seq[pos].float()
+        # Compute entropy of absolute activation distribution
+        abs_h = torch.abs(h)
+        total = abs_h.sum()
+        if total < 1e-10:
+            entropies.append(0.0)
+            continue
+        probs = abs_h / total
+        # Clamp for numerical stability
+        probs = torch.clamp(probs, min=1e-10)
+        ent = -torch.sum(probs * torch.log(probs)).item()
+        entropies.append(ent)
+
+    entropies = np.array(entropies)
+
+    # Normalize to weights that sum to 1
+    if entropies.sum() < 1e-10:
+        return np.ones(seq_len) / seq_len
+
+    weights = entropies / entropies.sum()
+    return weights
+
+
+def normalize_dimensions_adaptive(
+    hidden_seq: 'torch.Tensor',
+    circuit: Dict[str, Any],
+    scale: float = 0.5,
+) -> Dict[str, np.ndarray]:
+    """
+    v3.4: Two-pass per-dimension adaptive normalization.
+
+    Replaces the v3.3 global z-score + hard clamp with a per-dimension
+    approach that eliminates ceiling effects.
+
+    Pass 1: Compute z-score for each consciousness dimension at every
+            token position (relative to the full hidden-state distribution
+            at that position — this provides model-size independence).
+    Pass 2: Re-normalize each dimension against its own mean/std across
+            the sequence, then apply tanh for smooth bounding.
+
+    The result is that every dimension has meaningful variance regardless
+    of its absolute z-score level. Dimensions like Logic (which previously
+    pegged at +3.0 for every math token) now show within-sequence variation.
+
+    Args:
+        hidden_seq: Hidden states [seq_len, hidden_size]
+        circuit: Circuit dict with "dimensions" and "polarities"
+        scale: tanh scale factor (default 0.5). Controls sensitivity:
+               tanh(1*0.5)=0.46, tanh(2*0.5)=0.76, tanh(3*0.5)=0.91
+
+    Returns:
+        Dict mapping dimension name -> np.array of shape [seq_len]
+        with normalized, polarity-applied values in roughly (-1, +1).
+    """
+    seq_len = hidden_seq.shape[0]
+
+    # Pass 1: raw z-scores per dimension per position
+    dim_z_raw: Dict[str, list] = {name: [] for name in circuit["dimensions"]}
+    for pos in range(seq_len):
+        hidden = hidden_seq[pos]
+        h_mean = hidden.mean().item()
+        h_std = hidden.std().item()
+        for name, dim_idx in circuit["dimensions"].items():
+            if dim_idx < len(hidden):
+                z = (hidden[dim_idx].item() - h_mean) / (h_std + 1e-8)
+            else:
+                z = 0.0
+            dim_z_raw[name].append(z)
+
+    # Pass 2: per-dimension re-normalization + tanh
+    dim_normalized: Dict[str, np.ndarray] = {}
+    for name in circuit["dimensions"]:
+        z_arr = np.array(dim_z_raw[name])
+        z_mean = z_arr.mean()
+        z_std = z_arr.std()
+        # Floor std to avoid amplifying noise when a dimension is truly flat
+        z_std = max(z_std, 0.1)
+        # Re-center against this dimension's own baseline in this sequence
+        renormed = (z_arr - z_mean) / z_std
+        # Smooth bounding (no hard ceiling)
+        bounded = np.tanh(renormed * scale)
+        # Apply polarity
+        polarity = circuit["polarities"][name]
+        dim_normalized[name] = bounded * polarity
+
+    return dim_normalized
 
 
 # Default circuits directory
@@ -311,12 +631,12 @@ class UniversalCircuit:
         tokenizer,
         prompt: str,
         return_hidden: bool = False,
-        aggregation: str = "mean",  # "mean", "last", or "max"
+        aggregation: str = "mean",  # "mean", "last", "max", or "entropy_weighted"
         run_logit_lens: bool = False,
         logit_lens_top_k: int = 5,
         use_adaptive_layer: bool = True,
         layer_override: Optional[int] = None,
-        include_trajectory: bool = False,
+        length_normalize: bool = True,
     ) -> UniversalResult:
         """
         Measure consciousness score for a prompt.
@@ -326,12 +646,13 @@ class UniversalCircuit:
             tokenizer: Model tokenizer
             prompt: Text to measure
             return_hidden: Also return raw hidden states (all layers)
-            aggregation: How to aggregate token scores - "mean", "last", or "max"
+            aggregation: How to aggregate token scores - "mean", "last", "max",
+                         or "entropy_weighted" (weights tokens by information content)
             run_logit_lens: If True, also compute logit lens per layer
             logit_lens_top_k: Number of top tokens to return per layer
             use_adaptive_layer: Use depth-aware layer selection (recommended for 32B+)
             layer_override: Manually specify target layer (ignores adaptive)
-            include_trajectory: If True, compute trajectory dynamics (Lyapunov, Hurst, etc.)
+            length_normalize: Apply length normalization to reduce token-count bias (v3.2)
 
         Returns:
             UniversalResult with score, metadata, and optional hidden_states/logit_lens
@@ -348,7 +669,7 @@ class UniversalCircuit:
             target_layer = layer_override
         elif use_adaptive_layer:
             # Use adaptive layer selection for deep models
-            layer_frac = get_adaptive_layer_fraction(num_layers)
+            layer_frac = get_adaptive_layer_fraction(num_layers, model_name)
             target_layer = int(num_layers * layer_frac)
         else:
             # Use circuit's default layer fraction
@@ -366,86 +687,126 @@ class UniversalCircuit:
         # Get full sequence hidden states [seq_len, hidden_size]
         hidden_seq = outputs.hidden_states[target_layer][0].cpu().float()
         seq_len = hidden_seq.shape[0]
-        
+
         # Compute per-token scores
+        # v3.4.1 hybrid: z-score + tanh(z * scale) for smooth bounding
+        # Preserves absolute z-score level (strong Computation signal from v3.3)
+        # while eliminating hard ceiling effects (from v3.4 insight)
+        TANH_SCALE = 0.15  # tanh(z*0.15): z=3→0.42, z=5→0.64, z=8→0.83, z=10→0.91
+
         token_scores = []
         for pos in range(seq_len):
             hidden = hidden_seq[pos]
+            h_mean = hidden.mean().item()
+            h_std = hidden.std().item()
+
             dim_scores_pos = {}
             for name, dim_idx in circuit["dimensions"].items():
                 if dim_idx < len(hidden):
-                    activation = hidden[dim_idx].item()
+                    raw_act = hidden[dim_idx].item()
+                    z = (raw_act - h_mean) / (h_std + 1e-8)
+                    # Smooth bounding: preserves absolute level, no hard ceiling
+                    normalized = float(np.tanh(z * TANH_SCALE))
                     polarity = circuit["polarities"][name]
-                    dim_scores_pos[name] = activation * polarity
+                    dim_scores_pos[name] = normalized * polarity
             if dim_scores_pos:
                 raw = sum(dim_scores_pos.values()) / len(dim_scores_pos)
                 token_scores.append(1 / (1 + np.exp(-raw)))
             else:
                 token_scores.append(0.5)
-        
-        # Aggregate based on method
-        if aggregation == "mean":
+
+        # Aggregate based on method (v3.2: added entropy_weighted)
+        if aggregation == "entropy_weighted" and seq_len > 1:
+            # Weight tokens by their information content
+            ent_weights = entropy_weight_tokens(hidden_seq)
+            score = float(np.sum(np.array(token_scores) * ent_weights))
+        elif aggregation == "mean":
             score = float(np.mean(token_scores))
         elif aggregation == "max":
             score = float(np.max(token_scores))
         else:  # "last"
             score = token_scores[-1] if token_scores else 0.5
-        
+
+        raw_score = score  # Save pre-normalization score
+
+        # v3.2: Length normalization (additive baseline correction)
+        # Removes the score inflation caused by longer token sequences
+        if length_normalize:
+            expected_baseline = length_normalization_factor(seq_len)
+            # Re-center: how much does this prompt deviate from what's
+            # expected for its length? Then place on a 0-1 scale.
+            # deviation > 0 means more conscious than expected for length
+            deviation = score - expected_baseline
+            # Scale deviation to fill [0, 1] range, centered at 0.5
+            # A deviation of +/-0.3 maps to roughly 0.8/0.2
+            score = max(0.0, min(1.0, 0.5 + deviation * 1.5))
+
         # Compute dimension contributions using last token (for interpretability)
+        # v3.4.1 hybrid: tanh on raw z-scores
         hidden = hidden_seq[-1]
+        h_mean = hidden.mean().item()
+        h_std = hidden.std().item()
         dim_scores = {}
         for name, dim_idx in circuit["dimensions"].items():
             if dim_idx < len(hidden):
-                activation = hidden[dim_idx].item()
+                raw_act = hidden[dim_idx].item()
+                z = (raw_act - h_mean) / (h_std + 1e-8)
+                normalized = float(np.tanh(z * TANH_SCALE))
                 polarity = circuit["polarities"][name]
-                dim_scores[name] = activation * polarity
-                
+                dim_scores[name] = normalized * polarity
+
+        # v3.2: Quality metrics
+        diversity, dominant_dim = compute_dimension_diversity(dim_scores)
+        anomalies = detect_anomalies(token_scores, dim_scores, seq_len)
+        confidence = compute_confidence(seq_len, diversity, anomalies)
+
+        # v3.2: Dampen score toward 0.5 when anomalies detected
+        # This prevents embedding artifacts from producing extreme scores
+        if anomalies:
+            score = 0.5 + (score - 0.5) * confidence
+
         circuit_path = None
         if method == "discovered":
             model_id = get_model_id(model_name)
             path = self.circuits_dir / f"{model_id}_circuit.json"
             if path.exists():
                 circuit_path = str(path)
-        
+
         # Optional: return hidden states
         hidden_states_out = None
         if return_hidden:
             hidden_states_out = [h.cpu() for h in outputs.hidden_states]
-        
+
         # Optional: run logit lens
         logit_lens_out = None
         if run_logit_lens:
             try:
                 from .hooks import logit_lens
                 logit_lens_out = logit_lens(
-                    list(outputs.hidden_states), 
-                    model, 
-                    tokenizer, 
+                    list(outputs.hidden_states),
+                    model,
+                    tokenizer,
                     top_k=logit_lens_top_k
                 )
             except Exception as e:
                 # Fail gracefully if logit lens doesn't work for this model
                 logit_lens_out = None
-        
-        # Optional: compute trajectory metrics
-        trajectory_metrics_out = None
-        if include_trajectory:
-            try:
-                trajectory_metrics_out = self._compute_trajectory_metrics(hidden_seq.numpy())
-            except Exception as e:
-                # Fail gracefully if trajectory analysis fails
-                trajectory_metrics_out = None
-                
+
         return UniversalResult(
             score=score,
             method=method,
             dimension_scores=dim_scores,
             model_name=model_name,
             circuit_path=circuit_path,
+            confidence=confidence,
             hidden_states=hidden_states_out,
             logit_lens=logit_lens_out,
             target_layer=target_layer,
-            trajectory_metrics=trajectory_metrics_out,
+            raw_score=raw_score,
+            token_count=seq_len,
+            dimension_diversity=diversity,
+            dominant_dimension=dominant_dim,
+            anomaly_flags=anomalies,
         )
 
     def measure_ensemble(
@@ -507,16 +868,23 @@ class UniversalCircuit:
             hidden_seq = outputs.hidden_states[layer_idx][0].cpu().float()
             seq_len = hidden_seq.shape[0]
 
-            # Compute per-token scores
+            # v3.4.1 hybrid: z-score + tanh(z * scale)
+            TANH_SCALE = 0.15
+
             token_scores = []
             for pos in range(seq_len):
                 hidden = hidden_seq[pos]
+                h_mean = hidden.mean().item()
+                h_std = hidden.std().item()
+
                 dim_scores_pos = {}
                 for name, dim_idx in circuit["dimensions"].items():
                     if dim_idx < len(hidden):
-                        activation = hidden[dim_idx].item()
+                        raw_act = hidden[dim_idx].item()
+                        z = (raw_act - h_mean) / (h_std + 1e-8)
+                        normalized = float(np.tanh(z * TANH_SCALE))
                         polarity = circuit["polarities"][name]
-                        dim_scores_pos[name] = activation * polarity
+                        dim_scores_pos[name] = normalized * polarity
                 if dim_scores_pos:
                     raw = sum(dim_scores_pos.values()) / len(dim_scores_pos)
                     token_scores.append(1 / (1 + np.exp(-raw)))
@@ -533,15 +901,19 @@ class UniversalCircuit:
 
             layer_scores[layer_idx] = layer_score
 
-            # Store dimension scores from last token
+            # Store dimension scores from last token (v3.4.1 hybrid)
             hidden = hidden_seq[-1]
+            h_mean = hidden.mean().item()
+            h_std = hidden.std().item()
             for name, dim_idx in circuit["dimensions"].items():
                 if dim_idx < len(hidden):
-                    activation = hidden[dim_idx].item()
+                    raw_act = hidden[dim_idx].item()
+                    z = (raw_act - h_mean) / (h_std + 1e-8)
+                    normalized = float(np.tanh(z * TANH_SCALE))
                     polarity = circuit["polarities"][name]
                     if name not in all_dim_scores:
                         all_dim_scores[name] = []
-                    all_dim_scores[name].append(activation * polarity)
+                    all_dim_scores[name].append(normalized * polarity)
 
         # Weighted ensemble score
         ensemble_score = 0.0
@@ -602,7 +974,7 @@ class UniversalCircuit:
 
         # Determine target layer
         if use_adaptive_layer:
-            layer_frac = get_adaptive_layer_fraction(num_layers)
+            layer_frac = get_adaptive_layer_fraction(num_layers, model_name)
             target_layer = int(num_layers * layer_frac)
         else:
             layer_frac = circuit.get("layer_fraction", 0.75)
@@ -813,48 +1185,6 @@ class UniversalCircuit:
             circuits[name] = str(path)
             
         return circuits
-    
-    def _compute_trajectory_metrics(self, hidden_states: np.ndarray) -> Dict[str, Any]:
-        """
-        Compute trajectory dynamics metrics.
-        
-        Args:
-            hidden_states: Hidden state trajectory [seq_len, hidden_dim]
-            
-        Returns:
-            Dictionary with trajectory metrics
-        """
-        from .helios_metrics import (
-            compute_lyapunov_exponent,
-            compute_hurst_exponent,
-            compute_msd_from_trajectory,
-            verify_signal,
-        )
-        from .tame_metrics import compute_agency_score, detect_attractor_convergence
-        
-        # Compute chaos metrics
-        lyapunov = compute_lyapunov_exponent(hidden_states)
-        hurst = compute_hurst_exponent(hidden_states)
-        
-        # Compute trajectory class
-        signal_class = verify_signal(hidden_states, lyapunov, hurst)
-        
-        # Compute MSD
-        msd = compute_msd_from_trajectory(hidden_states)
-        
-        # Compute agency metrics
-        agency = compute_agency_score(hidden_states)
-        attractor_strength, is_converging = detect_attractor_convergence(hidden_states)
-        
-        return {
-            "lyapunov": float(lyapunov),
-            "hurst": float(hurst),
-            "signal_class": signal_class,
-            "msd_mean": float(np.mean(msd)) if len(msd) > 0 else 0.0,
-            "agency_score": float(agency),
-            "attractor_strength": float(attractor_strength),
-            "is_converging": bool(is_converging),
-        }
 
 
 class CachedUniversalCircuit(UniversalCircuit):
@@ -986,7 +1316,7 @@ class CachedUniversalCircuit(UniversalCircuit):
         if layer_override is not None:
             target_layer = layer_override
         elif use_adaptive:
-            layer_frac = get_adaptive_layer_fraction(num_layers)
+            layer_frac = get_adaptive_layer_fraction(num_layers, model_name)
             target_layer = int(num_layers * layer_frac)
         else:
             layer_frac = circuit.get("layer_fraction", 0.75)

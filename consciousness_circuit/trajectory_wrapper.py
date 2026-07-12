@@ -193,21 +193,16 @@ class ConsciousnessTrajectoryAnalyzer:
         token_trajectory = self.visualizer.measure_per_token(
             self.model, 
             self.tokenizer, 
-            prompt
+            prompt,
+            return_raw=True  # Get raw hidden states for trajectory analysis
         )
         
         # Extract hidden states for trajectory analysis
         if token_trajectory.raw_activations is not None:
             hidden_states = token_trajectory.raw_activations
         else:
-            # Fallback: get hidden states from measurement
-            result = self.circuit.measure(
-                self.model, 
-                self.tokenizer, 
-                prompt,
-                return_hidden_states=True
-            )
-            hidden_states = np.array(result.hidden_states) if result.hidden_states else None
+            # Fallback: create trajectory from scores (1D)
+            hidden_states = np.array(token_trajectory.scores).reshape(-1, 1)
         
         # If we couldn't get hidden states, create dummy trajectory from scores
         if hidden_states is None:

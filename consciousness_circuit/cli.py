@@ -318,88 +318,243 @@ def main_validate():
     print(f"Proper Ordering: {'✓ YES' if proper_order else '✗ NO'}")
 
 
-def main_trajectory():
-    """CLI entry point for consciousness-trajectory command."""
+def main_benchmark():
+    """CLI entry point for consciousness-benchmark command."""
     parser = argparse.ArgumentParser(
-        prog="consciousness-trajectory",
-        description="Deep trajectory analysis with consciousness measurement",
+        prog="consciousness-benchmark",
+        description="Benchmark consciousness metrics on synthetic trajectories",
     )
     parser.add_argument(
-        "prompt",
-        type=str,
-        help="Text to analyze (or use - to read from stdin)",
+        "--size", "-s",
+        type=int,
+        default=1000,
+        help="Trajectory length",
     )
     parser.add_argument(
-        "--model", "-m",
-        type=str,
-        default="Qwen/Qwen2.5-0.5B-Instruct",
-        help="HuggingFace model name or path",
+        "--iterations", "-n",
+        type=int,
+        default=100,
+        help="Number of benchmark iterations",
     )
     parser.add_argument(
-        "--device", "-d",
+        "--metrics", "-m",
         type=str,
-        default="cuda",
-        choices=["cuda", "cpu", "auto"],
-        help="Device to run on",
+        nargs="+",
+        default=["lyapunov", "hurst", "msd"],
+        help="Metrics to benchmark",
     )
     parser.add_argument(
         "--json",
         action="store_true",
         help="Output as JSON",
     )
+    
+    args = parser.parse_args()
+    
+    import numpy as np
+    import time
+    
+    # Generate synthetic trajectory
+    trajectory = np.random.randn(args.size, 128).astype(np.float32)
+    
+    results = {}
+    
+    print(f"\n{'='*60}")
+    print(f"Consciousness Metrics Benchmark")
+    print(f"Trajectory: {args.size} steps × 128 dims")
+    print(f"Iterations: {args.iterations}")
+    print(f"{'='*60}")
+    
+    # Import all metrics upfront
+    from .metrics.lyapunov import compute_lyapunov
+    from .metrics.hurst import compute_hurst
+    from .metrics.msd import compute_msd
+    
+    def get_lyap_value(t):
+        return compute_lyapunov(t).exponent
+    
+    def get_hurst_value(t):
+        return compute_hurst(t).exponent
+    
+    def get_msd_value(t):
+        return compute_msd(t).diffusion_exponent
+    
+    metric_funcs = {
+        "lyapunov": get_lyap_value,
+        "hurst": get_hurst_value,
+        "msd": get_msd_value,
+    }
+    
+    for metric in args.metrics:
+        try:
+            if metric not in metric_funcs:
+                print(f"  Unknown metric: {metric}")
+                continue
+            
+            func = metric_funcs[metric]
+            
+            # Warmup
+            _ = func(trajectory)
+            
+            # Benchmark
+            start = time.perf_counter()
+            for _ in range(args.iterations):
+                _ = func(trajectory)
+            elapsed = time.perf_counter() - start
+            
+            avg_ms = (elapsed / args.iterations) * 1000
+            results[metric] = {
+                "avg_ms": avg_ms,
+                "iterations": args.iterations,
+                "value": float(func(trajectory)),
+            }
+            
+            if not args.json:
+                print(f"  {metric:10s}: {avg_ms:.3f} ms/iter (value: {results[metric]['value']:.4f})")
+                
+        except Exception as e:
+            print(f"  {metric}: ERROR - {e}")
+    
+    if args.json:
+        print(json.dumps(results, indent=2))
+    else:
+        print(f"\n{'='*60}")
+
+
+def main_trajectory():
+    """CLI entry point for consciousness-trajectory command."""
+    parser = argparse.ArgumentParser(
+        prog="consciousness-trajectory",
+        description="Analyze trajectory from file or stdin",
+    )
     parser.add_argument(
-        "--full-analysis",
+        "input",
+        type=str,
+        help="Input file (.npy, .npz, .json) or - for stdin",
+    )
+    parser.add_argument(
+        "--classify",
         action="store_true",
-        help="Include full per-token trajectory",
+        help="Classify trajectory type",
+    )
+    parser.add_argument(
+        "--plugins",
+        action="store_true",
+        help="Show plugin recommendations",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON",
     )
     
     args = parser.parse_args()
     
-    # Handle stdin
-    if args.prompt == "-":
-        args.prompt = sys.stdin.read().strip()
+    import numpy as np
     
-    # Load model
-    print(f"Loading {args.model}...", file=sys.stderr)
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    import torch
+    # Load trajectory
+    if args.input == "-":
+        data = json.load(sys.stdin)
+        trajectory = np.array(data["trajectory"])
+    elif args.input.endswith(".npy"):
+        trajectory = np.load(args.input)
+    elif args.input.endswith(".npz"):
+        npz = np.load(args.input)
+        trajectory = npz[list(npz.keys())[0]]
+    elif args.input.endswith(".json"):
+        with open(args.input) as f:
+            data = json.load(f)
+        trajectory = np.array(data.get("trajectory", data))
+    else:
+        print(f"Unknown file format: {args.input}", file=sys.stderr)
+        sys.exit(1)
     
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        torch_dtype=torch.bfloat16,
-        device_map=args.device if args.device != "auto" else "auto",
-        trust_remote_code=True,
-    )
+    print(f"\n{'='*60}")
+    print(f"Trajectory Analysis")
+    print(f"Shape: {trajectory.shape}")
+    print(f"{'='*60}")
     
-    # Analyze
-    from .trajectory_wrapper import ConsciousnessTrajectoryAnalyzer
+    # Compute metrics
+    from .metrics.lyapunov import compute_lyapunov
+    from .metrics.hurst import compute_hurst
+    from .metrics.msd import compute_msd
     
-    analyzer = ConsciousnessTrajectoryAnalyzer()
-    analyzer.bind_model(model, tokenizer)
+    lyap_result = compute_lyapunov(trajectory)
+    hurst_result = compute_hurst(trajectory)
+    msd_result = compute_msd(trajectory)
     
-    print(f"\nAnalyzing: {args.prompt[:60]}...", file=sys.stderr)
-    result = analyzer.deep_analyze(args.prompt, include_per_token=args.full_analysis)
+    metrics = {
+        "lyapunov": float(lyap_result.exponent),
+        "hurst": float(hurst_result.exponent),
+        "msd": float(msd_result.diffusion_exponent),
+    }
+    
+    result = {"shape": list(trajectory.shape), "metrics": metrics}
+    
+    if not args.json:
+        print(f"\nMetrics:")
+        print(f"  Lyapunov: {metrics['lyapunov']:.4f}")
+        print(f"  Hurst:    {metrics['hurst']:.4f}")
+        print(f"  MSD:      {metrics['msd']:.4f}")
+    
+    # Classification
+    if args.classify:
+        from .classifiers.signal_class import SignalClassifier
+        classifier = SignalClassifier()
+        classification = classifier.classify(trajectory)
+        result["classification"] = {
+            "signal_class": str(classification.signal_class),
+            "confidence": float(classification.confidence),
+            "is_chaotic": classification.is_chaotic,
+            "is_stable": classification.is_stable,
+            "interpretation": classification.interpretation,
+        }
+        
+        if not args.json:
+            print(f"\nClassification:")
+            print(f"  Class: {classification.signal_class}")
+            print(f"  Confidence: {classification.confidence:.3f}")
+            print(f"  Chaotic: {classification.is_chaotic}, Stable: {classification.is_stable}")
+            print(f"  {classification.interpretation}")
+    
+    # Plugin recommendations
+    if args.plugins:
+        recommendations = []
+        
+        if metrics["lyapunov"] > 0.3:
+            recommendations.append({
+                "plugin": "AttractorLockPlugin",
+                "reason": f"High chaos (Lyapunov={metrics['lyapunov']:.2f})",
+            })
+        
+        if metrics["hurst"] < 0.4:
+            recommendations.append({
+                "plugin": "CoherenceBoostPlugin", 
+                "reason": f"Low memory (Hurst={metrics['hurst']:.2f})",
+            })
+        
+        result["plugin_recommendations"] = recommendations
+        
+        if not args.json:
+            print(f"\nPlugin Recommendations:")
+            if recommendations:
+                for rec in recommendations:
+                    print(f"  • {rec['plugin']}: {rec['reason']}")
+            else:
+                print(f"  No interventions needed ✓")
     
     if args.json:
-        print(json.dumps(result.to_dict(), indent=2))
+        print(json.dumps(result, indent=2))
     else:
-        print(f"\n{'='*70}")
-        print(f"Trajectory Analysis Results")
-        print(f"{'='*70}")
-        print(f"\nConsciousness Score: {result.consciousness_score:.3f}")
-        print(f"Trajectory Class: {result.trajectory_class}")
-        print(f"Lyapunov (chaos): {result.lyapunov:.4f}")
-        print(f"Hurst (memory): {result.hurst:.4f}")
-        print(f"Agency Score: {result.agency_score:.4f}")
-        print(f"Goal-directedness: {result.goal_directedness:.4f}")
-        print(f"Attractor Strength: {result.attractor_strength:.4f}")
-        print(f"Is Converging: {'Yes' if result.is_converging else 'No'}")
-        
-        print(f"\n{'='*70}")
-        print(f"Interpretation")
-        print(f"{'='*70}")
-        print(result.interpretation())
+        print(f"\n{'='*60}")
+
+
+# Aliases for entry points
+discover_circuit = main_discover
+measure_prompt = main_measure
+validate_model = main_validate
+run_benchmark = main_benchmark
+analyze_trajectory = main_trajectory
 
 
 if __name__ == "__main__":

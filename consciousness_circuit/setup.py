@@ -10,7 +10,7 @@ long_description = readme_path.read_text(encoding="utf-8") if readme_path.exists
 
 setup(
     name="consciousness-circuit",
-    version="3.0.0",
+    version="3.5.1",
     author="VFD-Org",
     author_email="research@vfd.org",
     description="Measure and analyze consciousness-like patterns in transformer LLMs",
@@ -82,6 +82,9 @@ setup(
         "console_scripts": [
             "consciousness-discover=consciousness_circuit.cli:discover_circuit",
             "consciousness-measure=consciousness_circuit.cli:measure_prompt",
+            "consciousness-validate=consciousness_circuit.cli:validate_model",
+            "consciousness-benchmark=consciousness_circuit.cli:run_benchmark",
+            "consciousness-trajectory=consciousness_circuit.cli:analyze_trajectory",
         ],
     },
 )

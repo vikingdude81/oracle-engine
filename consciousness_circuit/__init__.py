@@ -1,5 +1,5 @@
 """
-Consciousness Circuit v3.0
+Consciousness Circuit v3.5
 ==========================
 
 Measure meta-cognitive signatures ("consciousness-like" activations) in transformer LLMs.
@@ -19,47 +19,32 @@ Per-Token Analysis:
 
 Full API:
     from consciousness_circuit import UniversalCircuit, ValidationBasedDiscovery
-    
+
     # Measure with auto-detection
     circuit = UniversalCircuit()
     result = circuit.measure(model, tokenizer, prompt)
-    
+
     # Discover new circuit for a model
     discovery = ValidationBasedDiscovery(model, tokenizer)
     circuit = discovery.discover()
 
+Standalone Usage (numpy/scipy only — no torch/transformers required):
+    from consciousness_circuit import compute_lyapunov, compute_hurst, classify_signal
+    The metrics/, classifiers/, plugins/, training/, analyzers/, and benchmarks/
+    subpackages import without the ML stack. The full measurement API
+    (UniversalCircuit, measure_consciousness, ...) requires torch + transformers;
+    importing those names without the ML stack raises an informative ImportError.
+
 Author: VFD-Org
 License: MIT
-Version: 3.0.0
+Version: 3.5.1
 """
 
-from .circuit import ConsciousnessCircuit, CONSCIOUS_DIMS_V2_1, remap_dimensions
-from .analysis import analyze_dimension_activations, compare_models
-from .discover import DimensionDiscovery, DiscoveredCircuit, compare_architectures
-from .universal import (
-    UniversalCircuit,
-    UniversalResult,
-    measure_consciousness,
-    CachedUniversalCircuit,
-    get_adaptive_layer_fraction,
-    get_ensemble_layers,
-)
-from .visualization import (
-    TokenTrajectory,
-    ComparisonResult,
-    ConsciousnessVisualizer,
-    create_interactive_dashboard,
-)
+# ==============================================================================
+# Standalone layer (numpy/scipy only) — always available
+# ==============================================================================
+
 from .logging_config import get_logger, setup_logging, ExperimentLogger
-from .model_adapters import (
-    ModelAdapter,
-    HuggingFaceAdapter,
-    NanoGPTAdapter,
-    UnslothAdapter,
-    create_adapter,
-    get_hidden_states,
-)
-from .trajectory_wrapper import ConsciousnessTrajectoryAnalyzer, TrajectoryAnalysisResult
 from .helios_metrics import (
     compute_lyapunov_exponent,
     compute_hurst_exponent,
@@ -112,6 +97,8 @@ from .plugins import (
     AttractorLockPlugin,
     CoherenceBoostPlugin,
     GoalDirectorPlugin,
+    # Analysis plugins (standalone)
+    CompressibilityPlugin,
 )
 
 # Training utilities
@@ -137,13 +124,87 @@ from .benchmarks import (
     get_full_benchmark,
 )
 
+# ==============================================================================
+# Full-stack layer (requires torch + transformers) — optional
+# ==============================================================================
+
+FULL_STACK_AVAILABLE = True
+_FULL_STACK_IMPORT_ERROR = None
+
+try:
+    from .circuit import ConsciousnessCircuit, CONSCIOUS_DIMS_V2_1, remap_dimensions
+    from .analysis import analyze_dimension_activations, compare_models
+    from .discover import DimensionDiscovery, DiscoveredCircuit, compare_architectures
+    from .universal import (
+        UniversalCircuit,
+        UniversalResult,
+        measure_consciousness,
+        CachedUniversalCircuit,
+        get_adaptive_layer_fraction,
+        get_ensemble_layers,
+        # v3.2 scoring improvements
+        length_normalization_factor,
+        compute_dimension_diversity,
+        detect_anomalies,
+        compute_confidence,
+        entropy_weight_tokens,
+        # v3.4 per-dimension normalization
+        normalize_dimensions_adaptive,
+    )
+    from .visualization import (
+        TokenTrajectory,
+        ComparisonResult,
+        ConsciousnessVisualizer,
+        create_interactive_dashboard,
+    )
+    from .model_adapters import (
+        ModelAdapter,
+        HuggingFaceAdapter,
+        NanoGPTAdapter,
+        UnslothAdapter,
+        create_adapter,
+        get_hidden_states,
+    )
+    from .trajectory_wrapper import ConsciousnessTrajectoryAnalyzer, TrajectoryAnalysisResult
+except ImportError as _e:  # torch/transformers not installed
+    FULL_STACK_AVAILABLE = False
+    _FULL_STACK_IMPORT_ERROR = _e
+
+    def __getattr__(name):
+        """Give an informative error when full-stack names are accessed without torch/transformers."""
+        _full_stack_names = {
+            "ConsciousnessCircuit", "CONSCIOUS_DIMS_V2_1", "remap_dimensions",
+            "analyze_dimension_activations", "compare_models",
+            "DimensionDiscovery", "DiscoveredCircuit", "compare_architectures",
+            "UniversalCircuit", "UniversalResult", "measure_consciousness",
+            "CachedUniversalCircuit", "get_adaptive_layer_fraction", "get_ensemble_layers",
+            "length_normalization_factor", "compute_dimension_diversity",
+            "detect_anomalies", "compute_confidence", "entropy_weight_tokens",
+            "normalize_dimensions_adaptive",
+            "TokenTrajectory", "ComparisonResult", "ConsciousnessVisualizer",
+            "create_interactive_dashboard",
+            "ModelAdapter", "HuggingFaceAdapter", "NanoGPTAdapter", "UnslothAdapter",
+            "create_adapter", "get_hidden_states",
+            "ConsciousnessTrajectoryAnalyzer", "TrajectoryAnalysisResult",
+        }
+        if name in _full_stack_names:
+            raise ImportError(
+                f"consciousness_circuit.{name} requires the full ML stack "
+                f"(torch + transformers). Install with: pip install torch transformers\n"
+                f"Original error: {_FULL_STACK_IMPORT_ERROR}"
+            )
+        raise AttributeError(f"module 'consciousness_circuit' has no attribute {name!r}")
+
+
 # Lazy import for discover_validated (requires model to be loaded)
 def _get_validation_discovery():
     from .discover_validated import ValidationBasedDiscovery
     return ValidationBasedDiscovery
 
-__version__ = "3.0.0"
+__version__ = "3.5.1"
 __all__ = [
+    # Availability flag
+    "FULL_STACK_AVAILABLE",
     # Universal API (recommended)
     "UniversalCircuit",
     "UniversalResult",
@@ -151,6 +212,13 @@ __all__ = [
     "CachedUniversalCircuit",
     "get_adaptive_layer_fraction",
     "get_ensemble_layers",
+    # v3.2 scoring improvements
+    "length_normalization_factor",
+    "compute_dimension_diversity",
+    "detect_anomalies",
+    "compute_confidence",
+    "entropy_weight_tokens",
+    "normalize_dimensions_adaptive",
     # Visualization
     "TokenTrajectory",
     "ComparisonResult",
@@ -221,6 +289,7 @@ __all__ = [
     "AttractorLockPlugin",
     "CoherenceBoostPlugin",
     "GoalDirectorPlugin",
+    "CompressibilityPlugin",
     # Training utilities
     "RewardConfig",
     "RewardResult",

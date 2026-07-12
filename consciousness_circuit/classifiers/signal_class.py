@@ -323,18 +323,36 @@ class SignalClassifier:
         self.msd_confined = msd_confined_threshold
         self.use_fuzzy = use_fuzzy
     
-    def classify(self, metrics: Dict[str, float]) -> ClassificationResult:
+    def classify(self, data) -> ClassificationResult:
         """
         Classify signal with configured thresholds.
         
         Args:
-            metrics: Dictionary of computed metrics
+            data: Either a dictionary of pre-computed metrics, or a numpy array
+                  trajectory from which metrics will be computed.
         
         Returns:
             ClassificationResult
         """
-        # For now, delegates to the global functions
-        # Could be extended to use custom thresholds
+        import numpy as np
+        
+        # If data is an array, compute metrics from it
+        if isinstance(data, np.ndarray):
+            from ..metrics import compute_lyapunov, compute_hurst, compute_msd
+            
+            lyap = compute_lyapunov(data)
+            hurst = compute_hurst(data)
+            msd = compute_msd(data)
+            
+            metrics = {
+                'lyapunov': lyap.exponent,
+                'hurst': hurst.exponent,
+                'msd_alpha': msd.diffusion_exponent,
+            }
+        else:
+            # Assume it's already a dict
+            metrics = data
+        
         return classify_signal(metrics, use_fuzzy=self.use_fuzzy)
 
 
