@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+type: software
+title: "oracle-engine"
+authors:
+  - given-names: Alex
+    family-names: Bone
+    orcid: "https://orcid.org/0009-0003-4252-7556"
+repository-code: "https://github.com/vikingdude81/oracle-engine"
+url: "https://github.com/vikingdude81/oracle-engine"
