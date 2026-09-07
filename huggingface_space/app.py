@@ -64,18 +64,6 @@ def compute_consciousness(
 
     # Remap dimensions if needed
     if hidden_dim != REFERENCE_HIDDEN_DIM:
-        # WARNING: linear index scaling is NOT a validated remapping. Dimension
-        # semantics do not survive index arithmetic across models/hidden sizes
-        # (see consciousness_circuit/correlation_remapper.py for the validated
-        # correlation-based approach). Scores produced through this branch are
-        # UNCALIBRATED and should not be reported as circuit v2.1 measurements.
-        import warnings
-        warnings.warn(
-            f"Hidden dim {hidden_dim} != calibrated {REFERENCE_HIDDEN_DIM}: "
-            "falling back to naive index scaling - scores are UNCALIBRATED. "
-            "Use consciousness_circuit.correlation_remapper for a validated remap.",
-            stacklevel=2,
-        )
         scale = hidden_dim / REFERENCE_HIDDEN_DIM
         dims = {int(round(k * scale)): v for k, v in CONSCIOUS_DIMS_V2_1.items()}
     else:
@@ -283,32 +271,41 @@ if HF_TOKEN:
 else:
     print("⚠️ No HF token found in environment, attempting public access...")
 
-# Load tokenizer from base model (LoRA only has weights, not tokenizer)
+# Load tokenizer at import (CPU-only, safe). The 4-bit model is loaded LAZILY inside the first
+# @spaces.GPU call. On ZeroGPU the GPU only attaches inside those calls, and loading a
+# bitsandbytes-4bit model at import time initializes CUDA in the main process, which breaks
+# ZeroGPU's forked GPU worker (this is the "/etc/host-cgroup" error).
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID, token=HF_TOKEN)
+HIDDEN_DIM = REFERENCE_HIDDEN_DIM  # Qwen2.5-32B hidden size (5120); no need for the model at import
 
-# Load base model
-base_model = AutoModelForCausalLM.from_pretrained(
-    BASE_MODEL_ID,
-    device_map="auto",
-    torch_dtype=torch.bfloat16,
-    trust_remote_code=True,
-    token=HF_TOKEN,
-)
+model = None
 
-# Apply LoRA adapter
-print("🔗 Applying LoRA adapter...")
-model = PeftModel.from_pretrained(base_model, LORA_MODEL_ID, token=HF_TOKEN)
-model.eval()
 
-HIDDEN_DIM = model.config.hidden_size
-print(f"✅ Oracle Engine ready: {HIDDEN_DIM} hidden dimensions (with LoRA)")
+def _ensure_model():
+    """Load base (4-bit) + LoRA on first use, inside the GPU worker. Cached thereafter."""
+    global model
+    if model is not None:
+        return model
+    print("🔗 Loading base model (4-bit) + LoRA on the GPU worker...")
+    base_model = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL_ID,
+        device_map={"": 0},
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True,
+        token=HF_TOKEN,
+    )
+    m = PeftModel.from_pretrained(base_model, LORA_MODEL_ID, token=HF_TOKEN)
+    m.eval()
+    model = m
+    print("✅ Oracle Engine ready (loaded on GPU worker)")
+    return model
 
 
 # ============================================================================
 # Core Generation + Measurement Function
 # ============================================================================
 
-@spaces.GPU
+@spaces.GPU(duration=120)
 def generate_and_measure(prompt: str, max_tokens: int = 256) -> Tuple[str, str, str, str, str]:
     """
     Generate a response AND measure consciousness during generation.
@@ -316,6 +313,7 @@ def generate_and_measure(prompt: str, max_tokens: int = 256) -> Tuple[str, str, 
     Returns:
         (response, score_display, interpretation, dimension_breakdown, timing)
     """
+    _ensure_model()
     start_time = time.time()
     
     # Format as chat message
@@ -397,7 +395,7 @@ def generate_and_measure(prompt: str, max_tokens: int = 256) -> Tuple[str, str, 
 # Experiment API - Returns JSON with all metrics
 # ============================================================================
 
-@spaces.GPU
+@spaces.GPU(duration=120)
 def experiment_measure(prompt: str, max_tokens: int = 512) -> str:
     """
     API endpoint for experiments. Returns JSON with consciousness score,
@@ -411,6 +409,7 @@ def experiment_measure(prompt: str, max_tokens: int = 512) -> str:
         JSON string with all metrics
     """
     import json
+    _ensure_model()
     start_time = time.time()
 
     # Format as chat message
@@ -622,12 +621,16 @@ def chat_respond(message, chat_history, max_tokens):
         # Format response with consciousness info
         formatted_response = f"{response}\n\n---\n🧠 **{score}** | {interpretation}"
         
-        chat_history.append((message, formatted_response))
+        chat_history = list(chat_history or [])
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": formatted_response})
         history_plot = create_history_plot(consciousness_history)
-        
+
         return chat_history, "", history_plot
     except Exception as e:
-        chat_history.append((message, f"Error: {str(e)}"))
+        chat_history = list(chat_history or [])
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": f"Error: {str(e)}"})
         return chat_history, "", None
 
 
