@@ -306,21 +306,38 @@ def _ensure_model():
 # ============================================================================
 
 @spaces.GPU(duration=120)
-def generate_and_measure(prompt: str, max_tokens: int = 256) -> Tuple[str, str, str, str, str]:
+def generate_and_measure(prompt: str, max_tokens: int = 256, history=None) -> Tuple[str, str, str, str, str]:
     """
     Generate a response AND measure consciousness during generation.
-    
+
+    If `history` (a list of prior {"role","content"} turns) is given, the model
+    sees the whole conversation so Chat Mode is genuinely multi-turn. Single Query
+    passes no history and stays a one-shot prompt.
+
     Returns:
         (response, score_display, interpretation, dimension_breakdown, timing)
     """
     _ensure_model()
     start_time = time.time()
-    
-    # Format as chat message
-    messages = [{"role": "user", "content": prompt}]
+
+    # Build the message list from prior turns + the new user message.
+    messages = []
+    for turn in (history or []):
+        if not isinstance(turn, dict):
+            continue
+        role = turn.get("role")
+        content = turn.get("content", "")
+        if role not in ("user", "assistant") or not content:
+            continue
+        # Assistant turns carry an appended consciousness footer in the UI; strip it
+        # so the model only re-reads its actual reply.
+        if role == "assistant":
+            content = content.split("\n\n---\n")[0].rstrip()
+        messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": prompt})
     chat_prompt = tokenizer.apply_chat_template(
-        messages, 
-        tokenize=False, 
+        messages,
+        tokenize=False,
         add_generation_prompt=True
     )
     
@@ -598,26 +615,27 @@ def chat_respond(message, chat_history, max_tokens):
     
     if not message.strip():
         return chat_history, "", None
-    
+
     try:
+        # Pass the prior turns so the model actually remembers the conversation.
         response, score, interpretation, breakdown, timing = generate_and_measure(
-            message, max_tokens=int(max_tokens)
+            message, max_tokens=int(max_tokens), history=list(chat_history or [])
         )
-        
+
         # Extract score value
         score_val = float(score.split()[-1].replace('%', '')) / 100
-        
+
         # Add to history
         consciousness_history.append({
             'prompt': message[:50],
             'score': score_val,
             'interpretation': interpretation
         })
-        
+
         # Keep last 10
         if len(consciousness_history) > 10:
             consciousness_history = consciousness_history[-10:]
-        
+
         # Format response with consciousness info
         formatted_response = f"{response}\n\n---\n🧠 **{score}** | {interpretation}"
         
