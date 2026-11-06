@@ -191,14 +191,14 @@ def investigate_mistral_vs_qwen():
         # Find top-variance dimensions
         top_var_indices = np.argsort(variances)[-20:][::-1]
         
-        print(f"\nTop 20 High-Variance Dimensions:")
+        print("\nTop 20 High-Variance Dimensions:")
         print("-" * 50)
         for idx in top_var_indices:
             print(f"  Dim {idx:5d}: var={variances[idx]:.4f}, mean={means[idx]:.4f}")
             
         # Compare with remapped dimensions
         remapped = get_all_remapped(investigator.hidden_size)
-        print(f"\nRemapped Dimension Stats:")
+        print("\nRemapped Dimension Stats:")
         print("-" * 50)
         for name, dim_idx in remapped.items():
             if dim_idx < len(variances):

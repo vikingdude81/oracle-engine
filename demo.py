@@ -107,7 +107,7 @@ def main():
         
         print(f"\nScore: {bar} {result.score*100:.1f}%")
         print(f"Level: {result.interpretation}")
-        print(f"\nDimension Breakdown:")
+        print("\nDimension Breakdown:")
         
         sorted_dims = sorted(
             result.dimension_contributions.items(),

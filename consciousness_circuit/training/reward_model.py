@@ -31,7 +31,7 @@ Dependencies: numpy only
 """
 
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Optional
 
 

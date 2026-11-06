@@ -9,12 +9,11 @@ Combines consciousness measurement with trajectory dynamics from:
 Designed to work with ANY transformer model.
 """
 
-import torch
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
-from .universal import UniversalCircuit, UniversalResult
+from .universal import UniversalCircuit
 from .visualization import ConsciousnessVisualizer, TokenTrajectory
 from .helios_metrics import (
     SignalClass,
@@ -246,7 +245,7 @@ class ConsciousnessTrajectoryAnalyzer:
         """
         # Compute MSD
         msd = compute_msd_from_trajectory(hidden_states)
-        trajectory_class = classify_trajectory(msd)
+        classify_trajectory(msd)
         
         # Compute chaos metrics
         lyapunov = compute_lyapunov_exponent(hidden_states)

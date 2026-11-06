@@ -25,7 +25,7 @@ import torch
 import json
 import numpy as np
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Any, Union
+from typing import Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 import hashlib
 
@@ -788,7 +788,7 @@ class UniversalCircuit:
                     tokenizer,
                     top_k=logit_lens_top_k
                 )
-            except Exception as e:
+            except Exception:
                 # Fail gracefully if logit lens doesn't work for this model
                 logit_lens_out = None
 

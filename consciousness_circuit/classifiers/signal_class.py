@@ -23,7 +23,7 @@ Dependencies: numpy only
 import numpy as np
 from enum import Enum
 from dataclasses import dataclass
-from typing import Dict, Optional, Any
+from typing import Dict, Any
 
 
 class SignalClass(Enum):
@@ -334,7 +334,6 @@ class SignalClassifier:
         Returns:
             ClassificationResult
         """
-        import numpy as np
         
         # If data is an array, compute metrics from it
         if isinstance(data, np.ndarray):

@@ -19,13 +19,11 @@ from consciousness_circuit.helios_metrics import (
     compute_msd_from_trajectory,
     classify_trajectory,
     verify_signal,
-    compute_attractor_score,
 )
 from consciousness_circuit.tame_metrics import (
     compute_agency_score,
     detect_attractor_convergence,
     compute_goal_directedness,
-    compute_trajectory_coherence,
     TAMEMetrics,
 )
 

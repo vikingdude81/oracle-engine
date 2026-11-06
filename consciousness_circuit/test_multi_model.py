@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import argparse
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict
 import json
 
 # Model configurations: (name, hidden_dim, requires_auth)

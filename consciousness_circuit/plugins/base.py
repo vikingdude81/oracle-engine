@@ -160,7 +160,7 @@ class InterventionPlugin(ABC):
             )
         
         try:
-            modified_states = self.intervene(hidden_states, metrics)
+            self.intervene(hidden_states, metrics)
             self.intervention_count += 1
             
             return PluginResult(

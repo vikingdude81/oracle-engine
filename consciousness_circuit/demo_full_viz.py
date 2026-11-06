@@ -73,7 +73,7 @@ def test_model(model, tokenizer, circuit, viz, model_label):
         print(f"  [{level}] {result.score:.3f} - {prompt[:50]}...")
     
     # Summary
-    print(f"\n  Summary:")
+    print("\n  Summary:")
     for level in ["HIGH", "MEDIUM", "LOW"]:
         mean = np.mean(results[level])
         std = np.std(results[level])
@@ -103,7 +103,7 @@ def plot_trajectory_comparison(trajectories, labels, model_name, save_path):
         ax = axes[idx // 3, idx % 3]
         
         x = np.arange(len(traj.scores))
-        bars = ax.bar(x, traj.scores, color=colors[idx], alpha=0.7, edgecolor='black', linewidth=0.5)
+        ax.bar(x, traj.scores, color=colors[idx], alpha=0.7, edgecolor='black', linewidth=0.5)
         
         # Trend line
         if len(traj.scores) > 1:

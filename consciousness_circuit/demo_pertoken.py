@@ -17,7 +17,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from consciousness_circuit import (
     UniversalCircuit,
     ConsciousnessVisualizer,
-    measure_consciousness,
 )
 
 def main():

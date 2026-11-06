@@ -32,7 +32,7 @@ Usage:
 
 import torch
 import numpy as np
-from typing import List, Dict, Tuple, Optional, Union, Any
+from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 import warnings
 
@@ -173,15 +173,15 @@ class CorrelationRemapper:
         Returns:
             DimensionMapping object
         """
-        print(f"\n[CorrelationRemapper] Learning dimension mapping...")
+        print("\n[CorrelationRemapper] Learning dimension mapping...")
         print(f"  Source dims: {len(source_dims)}")
         print(f"  Test prompts: {len(test_prompts)}")
 
         # Get activations from both models
-        print(f"  Extracting source activations...")
+        print("  Extracting source activations...")
         source_acts = self._get_activations(source_model, source_tokenizer, test_prompts)
 
-        print(f"  Extracting target activations...")
+        print("  Extracting target activations...")
         target_acts = self._get_activations(target_model, target_tokenizer, test_prompts)
 
         source_hidden_size = source_acts.shape[1]
@@ -194,7 +194,7 @@ class CorrelationRemapper:
         mapping = {}
         correlations = {}
 
-        print(f"\n  Finding best correlations...")
+        print("\n  Finding best correlations...")
         for source_dim in source_dims:
             if source_dim >= source_hidden_size:
                 warnings.warn(f"Source dimension {source_dim} >= {source_hidden_size}, skipping")
@@ -234,7 +234,7 @@ class CorrelationRemapper:
         # Compute overall confidence
         confidence = np.mean([abs(c) for c in correlations.values()]) if correlations else 0.0
 
-        print(f"\n  Mapping complete!")
+        print("\n  Mapping complete!")
         print(f"    Mapped: {len(mapping)}/{len(source_dims)} dimensions")
         print(f"    Mean correlation: {confidence:.3f}")
 

@@ -7,7 +7,6 @@ Verifies that each module works in isolation without importing siblings.
 """
 
 import sys
-import os
 import subprocess
 
 # Color codes for output

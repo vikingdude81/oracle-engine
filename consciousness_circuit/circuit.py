@@ -15,8 +15,7 @@ Dimensions are automatically remapped for different model sizes using proportion
 """
 
 import torch
-import numpy as np
-from typing import Dict, Optional, Tuple, Any, Union
+from typing import Dict
 from dataclasses import dataclass
 
 # Reference model: Qwen2.5-32B-Instruct with 5120 hidden dimensions

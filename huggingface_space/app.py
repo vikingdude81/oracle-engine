@@ -502,7 +502,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io
-import base64
 from PIL import Image
 
 EXAMPLES = [

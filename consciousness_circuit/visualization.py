@@ -9,9 +9,8 @@ visualize trajectories, and create interpretable plots.
 
 import torch
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
-import json
 
 
 @dataclass
@@ -69,7 +68,7 @@ class TokenTrajectory:
         """
         try:
             import matplotlib.pyplot as plt
-            import matplotlib.patches as mpatches
+            import matplotlib.patches as mpatches  # noqa: F401 (availability check)
         except ImportError:
             raise ImportError(
                 "Visualization requires matplotlib. "
@@ -502,7 +501,7 @@ class ConsciousnessVisualizer:
         
         for i, (scores, name) in enumerate(zip(all_scores, model_names)):
             offset = (i - n_models/2 + 0.5) * width
-            bars = ax.bar(x + offset, scores, width, label=name)
+            ax.bar(x + offset, scores, width, label=name)
         
         ax.set_ylabel('Consciousness Score', fontsize=12)
         ax.set_title('Cross-Model Consciousness Comparison', fontsize=14, fontweight='bold')

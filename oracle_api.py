@@ -47,9 +47,8 @@ try:
 except ImportError:
     pass
 
-from typing import Optional, Dict, Any, List, Union
+from typing import Dict, Any, List
 from dataclasses import dataclass
-from datetime import datetime
 import json
 
 # ==============================================================================
@@ -213,7 +212,7 @@ class Oracle:
                 load_in_4bit=True,
             )
             FastLanguageModel.for_inference(model)
-            print(f"   ✅ Loaded via Unsloth (4-bit)")
+            print("   ✅ Loaded via Unsloth (4-bit)")
         except ImportError:
             from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
             import torch
@@ -229,7 +228,7 @@ class Oracle:
                 trust_remote_code=True,
             )
             tokenizer = AutoTokenizer.from_pretrained(path_or_name, trust_remote_code=True)
-            print(f"   ✅ Loaded via Transformers (4-bit)")
+            print("   ✅ Loaded via Transformers (4-bit)")
         
         print(f"   Hidden size: {model.config.hidden_size}")
         return model, tokenizer

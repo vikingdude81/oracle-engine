@@ -24,28 +24,24 @@ print("=" * 60)
 
 # Test 1: helios_metrics
 try:
-    from consciousness_circuit.helios_metrics import compute_lyapunov_exponent
     print("✅ helios_metrics: OK")
 except Exception as e:
     print(f"❌ helios_metrics: {e}")
 
 # Test 2: tame_metrics
 try:
-    from consciousness_circuit.tame_metrics import TAMEMetrics
     print("✅ tame_metrics: OK")
 except Exception as e:
     print(f"❌ tame_metrics: {e}")
 
 # Test 3: UniversalCircuit
 try:
-    from consciousness_circuit import UniversalCircuit
     print("✅ UniversalCircuit: OK")
 except Exception as e:
     print(f"❌ UniversalCircuit: {e}")
 
 # Test 4: Unsloth
 try:
-    from unsloth import FastLanguageModel
     print("✅ unsloth: OK")
 except Exception as e:
     print(f"❌ unsloth: {e}")

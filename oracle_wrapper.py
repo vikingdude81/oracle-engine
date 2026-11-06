@@ -58,12 +58,11 @@ try:
 except ImportError:
     pass
 
-import sys
 import json
 import argparse
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from dataclasses import dataclass, asdict
 
 # ==============================================================================
@@ -139,7 +138,7 @@ def load_nanogpt_model(preset_or_path: str, device: str = 'cuda'):
     available = list_nanogpt_models()
     if preset_name not in available and not Path(preset_name).exists():
         print(f"   ❌ Model not found: {preset_name}")
-        print(f"   Available models:")
+        print("   Available models:")
         for name, info in available.items():
             status = "✅" if info['exists'] else "❌"
             size = f"{info['size_mb']:.1f}MB" if info['size_mb'] else "N/A"
@@ -148,8 +147,8 @@ def load_nanogpt_model(preset_or_path: str, device: str = 'cuda'):
     
     _nanogpt_adapter = load_nanogpt(preset_name, device=device)
     
-    print(f"   ✅ Loaded NanoGPT model")
-    print(f"   Hidden size: 768 | Layers: 12\n")
+    print("   ✅ Loaded NanoGPT model")
+    print("   Hidden size: 768 | Layers: 12\n")
     
     return _nanogpt_adapter
 
@@ -189,7 +188,7 @@ def load_model(use_base: bool = False, model_path: Optional[str] = None, nanogpt
             load_in_4bit=True,
         )
         FastLanguageModel.for_inference(_model)
-        print(f"   ✅ Loaded via Unsloth (4-bit)")
+        print("   ✅ Loaded via Unsloth (4-bit)")
     except ImportError:
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         import torch
@@ -205,7 +204,7 @@ def load_model(use_base: bool = False, model_path: Optional[str] = None, nanogpt
             trust_remote_code=True,
         )
         _tokenizer = AutoTokenizer.from_pretrained(target, trust_remote_code=True)
-        print(f"   ✅ Loaded via Transformers (4-bit)")
+        print("   ✅ Loaded via Transformers (4-bit)")
     
     print(f"   Hidden size: {_model.config.hidden_size}")
     print(f"   Layers: {_model.config.num_hidden_layers}\n")
@@ -669,7 +668,7 @@ Examples:
         print("=" * 80)
         print(f"Current Consciousness: {feedback['current_consciousness']:.3f} (target: {feedback['target_consciousness']})")
         print(f"Current Agency: {feedback['current_agency']:.3f} (target: {feedback['target_agency']})")
-        print(f"\nGaps:")
+        print("\nGaps:")
         print(f"  Consciousness: {feedback['consciousness_gap']:+.3f}")
         print(f"  Agency: {feedback['agency_gap']:+.3f}")
         

@@ -10,7 +10,6 @@ Package-level imports work when torch is installed.
 """
 
 import sys
-import os
 import numpy as np
 
 # Add metrics to path for direct import

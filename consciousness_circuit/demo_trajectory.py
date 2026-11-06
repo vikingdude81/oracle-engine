@@ -19,7 +19,6 @@ from helios_metrics import (
     compute_hurst_exponent,
     compute_msd_from_trajectory,
     verify_signal,
-    SignalClass,
 )
 from tame_metrics import TAMEMetrics
 
@@ -66,22 +65,22 @@ def analyze_trajectory(name: str, trajectory: np.ndarray):
     msd = compute_msd_from_trajectory(trajectory)
     signal_class = verify_signal(trajectory, lyapunov, hurst)
     
-    print(f"\nChaos & Dynamics:")
+    print("\nChaos & Dynamics:")
     print(f"  Lyapunov exponent: {lyapunov:+.4f}")
     if lyapunov > 0.5:
-        print(f"    → High chaos (unstable)")
+        print("    → High chaos (unstable)")
     elif lyapunov < -0.3:
-        print(f"    → Stable/converging")
+        print("    → Stable/converging")
     else:
-        print(f"    → Neutral")
+        print("    → Neutral")
     
     print(f"  Hurst exponent: {hurst:.4f}")
     if hurst > 0.6:
-        print(f"    → Persistent (trending)")
+        print("    → Persistent (trending)")
     elif hurst < 0.4:
-        print(f"    → Anti-persistent (mean-reverting)")
+        print("    → Anti-persistent (mean-reverting)")
     else:
-        print(f"    → Random walk")
+        print("    → Random walk")
     
     print(f"  Signal class: {signal_class}")
     print(f"  MSD range: {msd[0]:.4f} → {msd[-1]:.4f}")
@@ -90,7 +89,7 @@ def analyze_trajectory(name: str, trajectory: np.ndarray):
     tame = TAMEMetrics()
     tame_results = tame.compute_all(trajectory)
     
-    print(f"\nAgency & Goal-Directedness:")
+    print("\nAgency & Goal-Directedness:")
     print(f"  Agency score: {tame_results['agency_score']:.4f}")
     print(f"  Goal-directedness: {tame_results['goal_directedness']:.4f}")
     print(f"  Attractor strength: {tame_results['attractor_strength']:.4f}")

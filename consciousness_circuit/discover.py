@@ -15,7 +15,7 @@ the semantic meaning empirically for each architecture.
 import torch
 import numpy as np
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import json
 from pathlib import Path
@@ -342,7 +342,7 @@ class DimensionDiscovery:
             DiscoveredCircuit with architecture-specific dimensions
         """
         print(f"\n{'='*60}")
-        print(f"DISCOVERING CONSCIOUSNESS CIRCUIT")
+        print("DISCOVERING CONSCIOUSNESS CIRCUIT")
         print(f"Model: {self.model_name}")
         print(f"{'='*60}")
         
@@ -433,7 +433,7 @@ class DimensionDiscovery:
             pol_str = "+" if polarity > 0 else "-"
             print(f"  {name:20s} → dim {dim_idx:5d}  [{pol_str}]  (d={disc:.3f})")
             
-        print(f"\nTop 20 Discriminating Dimensions:")
+        print("\nTop 20 Discriminating Dimensions:")
         print("-" * 70)
         print(f"{'Rank':>4} {'Dim':>6} {'Discrim':>8} {'Dir':>8} {'High':>8} {'Low':>8}")
         print("-" * 70)

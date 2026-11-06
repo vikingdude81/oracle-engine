@@ -74,10 +74,10 @@ try:
         compute_hurst_exponent,
         compute_msd_from_trajectory,
         verify_signal,
-        SignalClass,
+        SignalClass,  # noqa: F401 (availability check)
     )
     from consciousness_circuit.tame_metrics import TAMEMetrics
-    from consciousness_circuit import UniversalCircuit, ConsciousnessVisualizer
+    from consciousness_circuit import UniversalCircuit, ConsciousnessVisualizer  # noqa: F401 (availability check)
     import torch
     import numpy as np
     FULL_SUITE_AVAILABLE = True
@@ -127,7 +127,7 @@ def load_custom_model():
     # Enable fast inference mode
     FastLanguageModel.for_inference(model)
     
-    print(f"   ✅ Model loaded successfully!")
+    print("   ✅ Model loaded successfully!")
     print(f"   Hidden size: {model.config.hidden_size}")
     print(f"   Layers: {model.config.num_hidden_layers}")
     
@@ -169,7 +169,7 @@ def load_base_model():
     else:
         raise RuntimeError("Neither Unsloth nor Transformers available")
     
-    print(f"   ✅ Base model loaded!")
+    print("   ✅ Base model loaded!")
     return model, tokenizer
 
 
@@ -243,22 +243,22 @@ def analyze_trajectory(trajectory: np.ndarray, name: str = "Trajectory"):
     msd = compute_msd_from_trajectory(trajectory)
     signal_class = verify_signal(trajectory, lyapunov, hurst)
     
-    print(f"\n📊 CHAOS & DYNAMICS:")
+    print("\n📊 CHAOS & DYNAMICS:")
     print(f"   Lyapunov exponent: {lyapunov:+.4f}")
     if lyapunov > 0.5:
-        print(f"      → High chaos (unstable)")
+        print("      → High chaos (unstable)")
     elif lyapunov < -0.3:
-        print(f"      → Stable/converging")
+        print("      → Stable/converging")
     else:
-        print(f"      → Neutral")
+        print("      → Neutral")
     
     print(f"   Hurst exponent: {hurst:.4f}")
     if hurst > 0.6:
-        print(f"      → Persistent (trending)")
+        print("      → Persistent (trending)")
     elif hurst < 0.4:
-        print(f"      → Anti-persistent (mean-reverting)")
+        print("      → Anti-persistent (mean-reverting)")
     else:
-        print(f"      → Random walk")
+        print("      → Random walk")
     
     print(f"   Signal class: {signal_class}")
     print(f"   MSD range: {msd[0]:.4f} → {msd[-1]:.4f}")
@@ -267,7 +267,7 @@ def analyze_trajectory(trajectory: np.ndarray, name: str = "Trajectory"):
     tame = TAMEMetrics()
     tame_results = tame.compute_all(trajectory)
     
-    print(f"\n🎯 AGENCY & GOAL-DIRECTEDNESS:")
+    print("\n🎯 AGENCY & GOAL-DIRECTEDNESS:")
     print(f"   Agency score: {tame_results['agency_score']:.4f}")
     print(f"   Goal-directedness: {tame_results['goal_directedness']:.4f}")
     print(f"   Attractor strength: {tame_results['attractor_strength']:.4f}")
@@ -290,12 +290,12 @@ def analyze_prompt(model, tokenizer, circuit, prompt: str, show_details: bool = 
     # Measure consciousness using the circuit
     result = circuit.measure(model, tokenizer, prompt, return_hidden=True)
     
-    print(f"\n🧠 CONSCIOUSNESS MEASUREMENT:")
+    print("\n🧠 CONSCIOUSNESS MEASUREMENT:")
     print(f"   Consciousness Score: {result.score:.3f}")
     print(f"   Circuit source: {result.circuit_source}")
     
     if hasattr(result, 'dimension_scores') and result.dimension_scores:
-        print(f"\n   Dimension Breakdown:")
+        print("\n   Dimension Breakdown:")
         for dim_name, score in result.dimension_scores.items():
             bar = "█" * int(score * 20) + "░" * (20 - int(score * 20))
             print(f"      {dim_name}: {bar} {score:.3f}")

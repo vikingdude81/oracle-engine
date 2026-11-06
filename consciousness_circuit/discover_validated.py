@@ -11,7 +11,7 @@ This discovers circuits that actually work on test prompts by:
 
 import torch
 import numpy as np
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 from dataclasses import dataclass
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
@@ -248,7 +248,7 @@ class ValidationBasedDiscovery:
                     selected.append(score)
         
         if verbose:
-            print(f"\nTop 20 dimensions by correlation:")
+            print("\nTop 20 dimensions by correlation:")
             print("-" * 70)
             print(f"{'Rank':>4} {'Dim':>6} {'Pol':>5} {'Corr':>8} {'Disc':>8} {'Order':>6}")
             print("-" * 70)
@@ -287,7 +287,7 @@ class ValidationBasedDiscovery:
                 pol = polarities[name]
                 pol_str = "+" if pol > 0 else "-"
                 print(f"  {name}: dim {dim} [{pol_str}]")
-            print(f"\nValidation Metrics:")
+            print("\nValidation Metrics:")
             print(f"  Discrimination (H-L): {final_score['discrimination']:.3f}")
             print(f"  Proper Ordering: {'✓ YES' if final_score['proper_ordering'] else '✗ NO'}")
             print(f"  High Mean: {final_score['high_mean']:.3f}")

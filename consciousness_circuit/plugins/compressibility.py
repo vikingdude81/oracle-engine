@@ -36,7 +36,7 @@ Dependencies: numpy only
 """
 
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 try:
     from .base import AnalysisPlugin
@@ -345,8 +345,8 @@ class CompressibilityPlugin(_BaseClass):
         Computes how much variance the consciousness dimensions contribute
         to the top principal components vs random dimensions.
         """
-        n_eig = len(eigenvalues)
-        total_var = eigenvalues.sum()
+        len(eigenvalues)
+        eigenvalues.sum()
 
         # Which of the subsampled dims are consciousness dims?
         c_dim_mask = np.isin(dim_indices, consciousness_dims)

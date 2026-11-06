@@ -17,7 +17,7 @@ Dependencies: numpy only
 """
 
 import numpy as np
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 
 class GoalDirectorPlugin:

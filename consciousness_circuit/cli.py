@@ -84,12 +84,12 @@ def main_measure():
             print(json.dumps(trajectory.to_dict(), indent=2))
         else:
             print(f"\n{'='*50}")
-            print(f"Per-Token Analysis")
+            print("Per-Token Analysis")
             print(f"{'='*50}")
             print(f"Peak Score: {trajectory.peak_score:.3f} at token '{trajectory.peak_token[1]}'")
             print(f"Mean Score: {trajectory.mean_score:.3f}")
             print(f"Trend: {trajectory.trajectory_slope:+.4f} per token")
-            print(f"\nToken scores:")
+            print("\nToken scores:")
             for i, (tok, score) in enumerate(zip(trajectory.tokens, trajectory.scores)):
                 bar = "█" * int(score * 20)
                 print(f"  {i:3d}. {tok:15s} {score:.3f} {bar}")
@@ -360,7 +360,7 @@ def main_benchmark():
     results = {}
     
     print(f"\n{'='*60}")
-    print(f"Consciousness Metrics Benchmark")
+    print("Consciousness Metrics Benchmark")
     print(f"Trajectory: {args.size} steps × 128 dims")
     print(f"Iterations: {args.iterations}")
     print(f"{'='*60}")
@@ -470,7 +470,7 @@ def main_trajectory():
         sys.exit(1)
     
     print(f"\n{'='*60}")
-    print(f"Trajectory Analysis")
+    print("Trajectory Analysis")
     print(f"Shape: {trajectory.shape}")
     print(f"{'='*60}")
     
@@ -492,7 +492,7 @@ def main_trajectory():
     result = {"shape": list(trajectory.shape), "metrics": metrics}
     
     if not args.json:
-        print(f"\nMetrics:")
+        print("\nMetrics:")
         print(f"  Lyapunov: {metrics['lyapunov']:.4f}")
         print(f"  Hurst:    {metrics['hurst']:.4f}")
         print(f"  MSD:      {metrics['msd']:.4f}")
@@ -511,7 +511,7 @@ def main_trajectory():
         }
         
         if not args.json:
-            print(f"\nClassification:")
+            print("\nClassification:")
             print(f"  Class: {classification.signal_class}")
             print(f"  Confidence: {classification.confidence:.3f}")
             print(f"  Chaotic: {classification.is_chaotic}, Stable: {classification.is_stable}")
@@ -536,12 +536,12 @@ def main_trajectory():
         result["plugin_recommendations"] = recommendations
         
         if not args.json:
-            print(f"\nPlugin Recommendations:")
+            print("\nPlugin Recommendations:")
             if recommendations:
                 for rec in recommendations:
                     print(f"  • {rec['plugin']}: {rec['reason']}")
             else:
-                print(f"  No interventions needed ✓")
+                print("  No interventions needed ✓")
     
     if args.json:
         print(json.dumps(result, indent=2))

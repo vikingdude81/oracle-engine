@@ -8,9 +8,9 @@ differences in consciousness signatures between model sizes/architectures.
 
 import torch
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
-from .circuit import ConsciousnessCircuit, CONSCIOUS_DIMS_V2_1, REFERENCE_HIDDEN_DIM
+from .circuit import ConsciousnessCircuit, CONSCIOUS_DIMS_V2_1
 import json
 from datetime import datetime
 
@@ -248,12 +248,12 @@ def print_analysis(analysis: ModelAnalysis):
     
     print(f"\nOverall Score: {analysis.avg_score:.3f} ± {analysis.std_score:.3f}")
     
-    print(f"\nDimension Activations (normalized):")
+    print("\nDimension Activations (normalized):")
     print("-" * 50)
     for name, act in analysis.dimension_activations.items():
         print(f"  {name:<20} mean={act.mean_normalized:+.3f} std={act.std_normalized:.3f}")
     
-    print(f"\nPer-Prompt Scores:")
+    print("\nPer-Prompt Scores:")
     print("-" * 50)
     for ps in analysis.prompt_scores:
         prompt_short = ps['prompt'][:40] + '...' if len(ps['prompt']) > 40 else ps['prompt']
@@ -267,20 +267,20 @@ def print_comparison(comparison: Dict[str, Any]):
     print(f"{'='*70}")
     
     print(f"\nModels tested: {comparison['num_models']}")
-    print(f"\nScore Summary:")
+    print("\nScore Summary:")
     print("-" * 50)
     for name, data in comparison['models'].items():
         print(f"  {name:<40} C={data['avg_score']:.3f} ± {data['std_score']:.3f} (dim={data['hidden_dim']})")
     
     if 'size_effect' in comparison:
         se = comparison['size_effect']
-        print(f"\nSize Effect Analysis:")
+        print("\nSize Effect Analysis:")
         print("-" * 50)
         print(f"  Smallest: {se['smallest_model']} → {se['smallest_score']:.3f}")
         print(f"  Largest:  {se['largest_model']} → {se['largest_score']:.3f}")
         print(f"  Smaller models score higher: {se['smaller_scores_higher']}")
     
-    print(f"\nDimension Consistency (cross-model):")
+    print("\nDimension Consistency (cross-model):")
     print("-" * 50)
     for dim_name, data in comparison['dimension_comparison'].items():
         if data['cross_model_mean'] is not None:

@@ -25,7 +25,6 @@ from consciousness_circuit.benchmarks import (
     get_test_suite,
     get_full_benchmark,
     ModelProfiler,
-    ProfileResult,
 )
 from transformers import AutoModel, AutoTokenizer
 

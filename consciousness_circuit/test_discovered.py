@@ -7,9 +7,8 @@ better, more meaningful scores than the proportionally-remapped approach.
 
 import torch
 import json
-from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 import numpy as np
 
 
@@ -91,7 +90,7 @@ def test_discovered_circuit(model_name: str, circuit_path: str, device: str = "c
     """Test a discovered circuit on various prompts."""
     
     print(f"\n{'='*70}")
-    print(f"TESTING DISCOVERED CIRCUIT")
+    print("TESTING DISCOVERED CIRCUIT")
     print(f"Model: {model_name}")
     print(f"Circuit: {circuit_path}")
     print(f"{'='*70}")
@@ -101,7 +100,7 @@ def test_discovered_circuit(model_name: str, circuit_path: str, device: str = "c
     print(f"\nCircuit dimensions: {list(circuit['dimensions'].keys())}")
     
     # Load model
-    print(f"\nLoading model...")
+    print("\nLoading model...")
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -163,7 +162,7 @@ def compare_discovered_vs_remapped(model_name: str, circuit_path: str, device: s
     from circuit import ConsciousnessCircuit  # Import the remapped version
     
     print(f"\n{'='*70}")
-    print(f"DISCOVERED vs REMAPPED COMPARISON")
+    print("DISCOVERED vs REMAPPED COMPARISON")
     print(f"Model: {model_name}")
     print(f"{'='*70}")
     

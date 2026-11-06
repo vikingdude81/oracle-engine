@@ -12,7 +12,7 @@ Commands:
 Run it with a Python that has CUDA torch + transformers + peft + bitsandbytes installed, e.g.:
   "C:\\Users\\akbon\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe" oracle_chat.py
 """
-import os, sys, json, time, datetime
+import os, json, time, datetime
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel

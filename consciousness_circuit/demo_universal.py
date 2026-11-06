@@ -11,7 +11,7 @@ import argparse
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Import from our package
-from universal import UniversalCircuit, measure_consciousness
+from universal import UniversalCircuit
 
 
 def load_model(model_name: str, device: str = "cuda:0"):

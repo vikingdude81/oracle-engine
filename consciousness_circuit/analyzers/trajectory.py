@@ -31,7 +31,7 @@ from ..metrics import (
     compute_msd_from_trajectory,
     TAMEMetrics,
 )
-from ..classifiers import SignalClass, classify_signal
+from ..classifiers import classify_signal
 
 
 @dataclass

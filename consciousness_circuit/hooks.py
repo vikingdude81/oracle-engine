@@ -7,7 +7,7 @@ Goals:
 - Optional logit-lens helper on cached hidden states.
 """
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import torch
 
@@ -90,7 +90,7 @@ def logit_lens(
     if not hasattr(model, "lm_head"):
         raise ValueError("Model has no lm_head for logit lens")
     results: List[List[Tuple[str, float]]] = []
-    device = hidden_states[0].device
+    hidden_states[0].device
     lm_head = model.lm_head
     norm = getattr(model, "model", None)
     norm = getattr(norm, "norm", None) if norm else None

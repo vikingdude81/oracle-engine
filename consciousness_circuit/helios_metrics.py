@@ -14,7 +14,7 @@ Key Components:
 
 import numpy as np
 from enum import Enum
-from typing import Tuple, List, Optional
+from typing import Tuple, Optional
 from scipy import signal as scipy_signal
 
 

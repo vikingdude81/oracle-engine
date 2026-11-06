@@ -11,7 +11,6 @@ from consciousness_circuit import (
     UniversalCircuit,
     ConsciousnessVisualizer,
     TokenTrajectory,
-    measure_consciousness,
 )
 print("✓ All imports successful!")
 
@@ -62,7 +61,7 @@ for prompt in prompts:
     print(f"  Trend: {trajectory.trajectory_slope:+.4f} per token")
     
     # Show first 10 tokens
-    print(f"\n  Token trajectory (first 10):")
+    print("\n  Token trajectory (first 10):")
     for i, (tok, score) in enumerate(zip(trajectory.tokens[:10], trajectory.scores[:10])):
         bar = "█" * int(score * 20)
         print(f"    {i:2d}. {tok:12s} {score:.3f} {bar}")
@@ -74,7 +73,7 @@ print("="*60)
 # Test comparison
 print("\nTesting prompt comparison...")
 comparison = viz.compare_prompts(model, tokenizer, prompts)
-print(f"\nComparison results:")
+print("\nComparison results:")
 for label, score in zip(comparison.labels, comparison.scores):
     print(f"  {score:.3f} - {label}")
 

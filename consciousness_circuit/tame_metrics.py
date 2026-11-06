@@ -11,7 +11,6 @@ Measures how hidden states exhibit goal-directed, agentic behavior.
 
 import numpy as np
 from typing import Tuple, Optional
-from scipy.spatial.distance import cdist
 
 
 def compute_agency_score(trajectory: np.ndarray, 
